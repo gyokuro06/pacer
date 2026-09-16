@@ -4,8 +4,8 @@ import {
   confirmProposalState,
   createRoomState,
   formatRemainingMs,
-  FUNNY_NICKNAMES,
-  generateFunnyNickname,
+  AUTO_DISPLAY_NAMES,
+  generateAutoDisplayName,
   isRoomExpired,
   joinRoomState,
   MAX_PARTICIPANTS,
@@ -30,16 +30,16 @@ describe("formatRemainingMs", () => {
   });
 });
 
-describe("generateFunnyNickname", () => {
-  it("picks from the funny nickname list", () => {
-    const name = generateFunnyNickname(() => 0);
-    assert.equal(name, FUNNY_NICKNAMES[0]);
-    assert.ok(FUNNY_NICKNAMES.includes(name as (typeof FUNNY_NICKNAMES)[number]));
+describe("generateAutoDisplayName", () => {
+  it("picks from the auto display name list", () => {
+    const name = generateAutoDisplayName(() => 0);
+    assert.equal(name, AUTO_DISPLAY_NAMES[0]);
+    assert.ok(AUTO_DISPLAY_NAMES.includes(name as (typeof AUTO_DISPLAY_NAMES)[number]));
   });
 
   it("never returns empty", () => {
-    for (let i = 0; i < FUNNY_NICKNAMES.length; i += 1) {
-      const name = generateFunnyNickname(() => i / FUNNY_NICKNAMES.length);
+    for (let i = 0; i < AUTO_DISPLAY_NAMES.length; i += 1) {
+      const name = generateAutoDisplayName(() => i / AUTO_DISPLAY_NAMES.length);
       assert.ok(name.length > 0);
     }
   });

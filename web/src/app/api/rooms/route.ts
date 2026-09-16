@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   DEFAULT_BREAK_MINUTES,
   DEFAULT_WORK_MINUTES,
-  generateFunnyNickname,
+  generateAutoDisplayName,
 } from "@/lib/room";
 import { createRoom, newParticipantId } from "@/lib/room-store";
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const displayName =
     typeof body.displayName === "string" && body.displayName.trim()
       ? body.displayName.trim()
-      : generateFunnyNickname();
+      : generateAutoDisplayName();
   const participantId = newParticipantId();
   const room = await createRoom(workMinutes, breakMinutes, {
     id: participantId,

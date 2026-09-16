@@ -27,7 +27,7 @@ export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export const FUNNY_NICKNAMES = [
+export const AUTO_DISPLAY_NAMES = [
   "ねこぱんつ",
   "うどん侍",
   "もちもち太郎",
@@ -46,11 +46,11 @@ export function generateRoomCode(length = 6): string {
   return code;
 }
 
-export function generateFunnyNickname(
+export function generateAutoDisplayName(
   random = Math.random,
 ): string {
-  const index = Math.floor(random() * FUNNY_NICKNAMES.length);
-  return FUNNY_NICKNAMES[index] ?? FUNNY_NICKNAMES[0];
+  const index = Math.floor(random() * AUTO_DISPLAY_NAMES.length);
+  return AUTO_DISPLAY_NAMES[index] ?? AUTO_DISPLAY_NAMES[0];
 }
 
 export function formatRemainingMs(remainingMs: number): string {

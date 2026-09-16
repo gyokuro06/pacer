@@ -28,9 +28,9 @@ class DirectTimerShareStep {
         RoomPage(ParticipantSessions.page(name)).copyShareUrlAndAssertClipboard()
     }
 
-    @Step("参加者 <name> におもしろ仮名が表示されている")
-    fun 参加者におもしろ仮名が表示されている(name: String) {
-        RoomPage(ParticipantSessions.page(name)).assertFunnyNicknameVisible()
+    @Step("参加者 <name> に表示名が自動で付いている")
+    fun 参加者に表示名が自動で付いている(name: String) {
+        RoomPage(ParticipantSessions.page(name)).assertAutoDisplayNameVisible()
     }
 
     @Step("参加者 <name> として共有ルームを開く")

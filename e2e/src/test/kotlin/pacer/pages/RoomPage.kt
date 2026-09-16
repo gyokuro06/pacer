@@ -46,12 +46,12 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(breakMinutesInput()).isDisabled()
     }
 
-    fun assertFunnyNicknameVisible() {
+    fun assertAutoDisplayNameVisible() {
         PlaywrightAssertions.assertThat(displayNameInput()).isVisible()
         val name = displayNameInput().inputValue().trim()
-        require(name.isNotEmpty()) { "おもしろ仮名が表示されていません" }
-        require(FUNNY_NICKNAMES.contains(name)) {
-            "表示名がおもしろ仮名一覧にありません: $name"
+        require(name.isNotEmpty()) { "表示名が自動で付いていません" }
+        require(AUTO_DISPLAY_NAMES.contains(name)) {
+            "表示名が候補一覧にありません: $name"
         }
     }
 
@@ -188,7 +188,7 @@ class RoomPage(page: Page) : BasePage(page) {
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("提案を確定"))
 
     companion object {
-        private val FUNNY_NICKNAMES = setOf(
+        private val AUTO_DISPLAY_NAMES = setOf(
             "ねこぱんつ",
             "うどん侍",
             "もちもち太郎",
