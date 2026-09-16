@@ -10,9 +10,14 @@ class SharedWorkBreakStep {
         ParticipantSessions.openHome(name, SetupAndTeardown.browser())
     }
 
-    @Step("参加者 <name> が作業 <workMinutes> 分・休憩 <breakMinutes> 分でルームを作成する")
-    fun 参加者が作業分休憩分でルームを作成する(name: String, workMinutes: String, breakMinutes: String) {
-        HomePage(ParticipantSessions.page(name)).createRoom(workMinutes, breakMinutes)
+    @Step("参加者 <name> が表示名 <displayName> で作業 <workMinutes> 分・休憩 <breakMinutes> 分でルームを作成する")
+    fun 参加者が表示名で作業分休憩分でルームを作成する(
+        name: String,
+        displayName: String,
+        workMinutes: String,
+        breakMinutes: String,
+    ) {
+        HomePage(ParticipantSessions.page(name)).createRoom(workMinutes, breakMinutes, displayName)
     }
 
     @Step("参加者 <name> にルームコードが表示されている")
@@ -49,5 +54,15 @@ class SharedWorkBreakStep {
     @Step("参加者 <name> に休憩フェーズが表示されている")
     fun 参加者に休憩フェーズが表示されている(name: String) {
         RoomPage(ParticipantSessions.page(name)).assertBreakPhase()
+    }
+
+    @Step("参加者 <name> が再開を提案する")
+    fun 参加者が再開を提案する(name: String) {
+        RoomPage(ParticipantSessions.page(name)).proposeResume()
+    }
+
+    @Step("参加者 <name> が再開提案を確定する")
+    fun 参加者が再開提案を確定する(name: String) {
+        RoomPage(ParticipantSessions.page(name)).confirmResumeProposal()
     }
 }

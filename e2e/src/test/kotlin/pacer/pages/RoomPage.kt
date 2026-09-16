@@ -30,6 +30,14 @@ class RoomPage(page: Page) : BasePage(page) {
         confirmProposalButton().click()
     }
 
+    fun proposeResume() {
+        proposeResumeButton().click()
+    }
+
+    fun confirmResumeProposal() {
+        confirmProposalButton().click()
+    }
+
     fun assertBreakPhase() {
         PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
     }
@@ -49,6 +57,9 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun proposeBreakButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("休憩を提案"))
+
+    private fun proposeResumeButton(): Locator =
+        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("再開を提案"))
 
     private fun confirmProposalButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("提案を確定"))
