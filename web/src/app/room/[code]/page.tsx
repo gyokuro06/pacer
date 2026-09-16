@@ -39,6 +39,7 @@ export default function RoomPage() {
   const [draftWork, setDraftWork] = useState<string | null>(null);
   const [draftBreak, setDraftBreak] = useState<string | null>(null);
   const [draftName, setDraftName] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -145,6 +146,11 @@ export default function RoomPage() {
       setCopyDone(false);
       setError("共有URLのコピーに失敗しました");
     }
+  }
+
+  async function changeEmoji(emoji: string) {
+    setShowEmojiPicker(false);
+    await patchRoom({ emoji });
   }
 
   const isParticipant = useMemo(() => {
@@ -354,6 +360,70 @@ export default function RoomPage() {
         </div>
 
         {error ? <p className={styles.error}>{error}</p> : null}
+
+        <ul className={styles.participants} role="list" aria-label="参加者一覧">
+          {room.participants.map((p) => {
+            const isOwn = p.id === participantId;
+            return (
+              <li key={p.id} className={styles.participant} role="listitem">
+                {isOwn ? <span className={styles.youLabel}>You</span> : null}
+                <button
+                  type="button"
+                  className={styles.avatar}
+                  onClick={() => isOwn && setShowEmojiPicker(true)}
+                  aria-label={isOwn ? "絵文字を変更" : p.emoji}
+                  disabled={!isOwn}
+                  data-own-avatar={isOwn ? "" : undefined}
+                >
+                  {p.emoji}
+                </button>
+                <span className={styles.participantName}>{p.displayName}</span>
+              </li>
+            );
+          })}
+        </ul>
+
+        {showEmojiPicker ? (
+          <div
+            className={styles.emojiPickerOverlay}
+            onClick={() => setShowEmojiPicker(false)}
+            role="presentation"
+          >
+            <div
+              className={styles.emojiPicker}
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-label="絵文字を選択"
+            >
+              <h3>絵文字を選択</h3>
+              <div className={styles.emojiGrid}>
+                {[
+                  "😀", "😃", "😄", "😁", "😆", "😊", "😇", "🙂",
+                  "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙",
+                  "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐",
+                  "🤓", "😎", "🥳", "🤩", "😏", "😒", "😞", "😔",
+                  "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼",
+                  "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔",
+                  "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺",
+                  "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍑",
+                  "🍒", "🍍", "🥝", "🥑", "🍅", "🍆", "🥕", "🌽",
+                  "🌶️", "🥒", "🥬", "🥦", "🧄", "🧅", "🍄", "🥜",
+                  "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏉", "🥏",
+                  "🎱", "🏓", "🏸", "🏒", "🏑", "🥍", "🏏", "⛳",
+                ].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className={styles.emojiOption}
+                    onClick={() => void changeEmoji(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );

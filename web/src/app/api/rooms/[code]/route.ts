@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getRoom,
   updateDisplayName,
+  updateEmoji,
   updateRoomMinutes,
 } from "@/lib/room-store";
 import { requireRoomMember } from "@/lib/room";
@@ -33,6 +34,7 @@ export async function PATCH(request: Request, { params }: Params) {
     workMinutes?: number;
     breakMinutes?: number;
     displayName?: string;
+    emoji?: string;
   };
 
   try {
@@ -49,6 +51,9 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     if (typeof body.displayName === "string") {
       room = await updateDisplayName(code, participantId, body.displayName);
+    }
+    if (typeof body.emoji === "string") {
+      room = await updateEmoji(code, participantId, body.emoji);
     }
     return NextResponse.json({ room });
   } catch (error) {

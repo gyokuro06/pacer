@@ -46,7 +46,7 @@ describe("generateAutoDisplayName", () => {
 });
 
 describe("requireRoomMember", () => {
-  const alice = { id: "a", displayName: "Alice" };
+  const alice = { id: "a", displayName: "Alice", emoji: "😀" };
 
   it("returns participant id when member", () => {
     const room = createRoomState(60, 10, alice, "ABCDEF");
@@ -66,8 +66,8 @@ describe("requireRoomMember", () => {
 });
 
 describe("session flow", () => {
-  const alice = { id: "a", displayName: "Alice" };
-  const bob = { id: "b", displayName: "Bob" };
+  const alice = { id: "a", displayName: "Alice", emoji: "😀" };
+  const bob = { id: "b", displayName: "Bob", emoji: "😃" };
 
   it("allows solo start with one participant", () => {
     const room = createRoomState(60, 10, alice, "ABCDEF");
@@ -115,10 +115,10 @@ describe("session flow", () => {
 
 describe("display-name rejoin and TTL", () => {
   const now = 1_000_000;
-  const alice = { id: "a", displayName: "Alice" };
-  const bob = { id: "b", displayName: "Bob" };
-  const carol = { id: "c", displayName: "Carol" };
-  const dave = { id: "d", displayName: "Dave" };
+  const alice = { id: "a", displayName: "Alice", emoji: "😀" };
+  const bob = { id: "b", displayName: "Bob", emoji: "😃" };
+  const carol = { id: "c", displayName: "Carol", emoji: "😄" };
+  const dave = { id: "d", displayName: "Dave", emoji: "😁" };
 
   function fullRoom() {
     let room = createRoomState(25, 5, alice, "ABCDEF", now);

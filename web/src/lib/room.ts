@@ -5,6 +5,7 @@ export type ProposalKind = "break" | "work";
 export type Participant = {
   id: string;
   displayName: string;
+  emoji: string;
 };
 
 export type Room = {
@@ -38,6 +39,21 @@ export const AUTO_DISPLAY_NAMES = [
   "めんだこ博士",
 ] as const;
 
+export const AUTO_EMOJIS = [
+  "😀", "😃", "😄", "😁", "😆", "😊", "😇", "🙂",
+  "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙",
+  "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐",
+  "🤓", "😎", "🥳", "🤩", "😏", "😒", "😞", "😔",
+  "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼",
+  "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔",
+  "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺",
+  "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍑",
+  "🍒", "🍍", "🥝", "🥑", "🍅", "🍆", "🥕", "🌽",
+  "🌶️", "🥒", "🥬", "🥦", "🧄", "🧅", "🍄", "🥜",
+  "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏉", "🥏",
+  "🎱", "🏓", "🏸", "🏒", "🏑", "🥍", "🏏", "⛳",
+] as const;
+
 export function generateRoomCode(length = 6): string {
   let code = "";
   for (let i = 0; i < length; i += 1) {
@@ -51,6 +67,13 @@ export function generateAutoDisplayName(
 ): string {
   const index = Math.floor(random() * AUTO_DISPLAY_NAMES.length);
   return AUTO_DISPLAY_NAMES[index] ?? AUTO_DISPLAY_NAMES[0];
+}
+
+export function generateAutoEmoji(
+  random = Math.random,
+): string {
+  const index = Math.floor(random() * AUTO_EMOJIS.length);
+  return AUTO_EMOJIS[index] ?? AUTO_EMOJIS[0];
 }
 
 export function formatRemainingMs(remainingMs: number): string {
@@ -209,6 +232,26 @@ export function updateDisplayNameState(
   }
   const participants = room.participants.map((p, i) =>
     i === index ? { ...p, displayName: trimmed } : p,
+  );
+  return { ...room, participants, lastActivityAt: now };
+}
+
+export function updateEmojiState(
+  room: Room,
+  participantId: string,
+  emoji: string,
+  now = Date.now(),
+): Room {
+  const trimmed = emoji.trim();
+  if (!trimmed) {
+    throw new Error("絵文字は必須です");
+  }
+  const index = room.participants.findIndex((p) => p.id === participantId);
+  if (index < 0) {
+    throw new Error("参加者が見つかりません");
+  }
+  const participants = room.participants.map((p, i) =>
+    i === index ? { ...p, emoji: trimmed } : p,
   );
   return { ...room, participants, lastActivityAt: now };
 }

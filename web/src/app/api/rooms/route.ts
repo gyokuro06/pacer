@@ -3,6 +3,7 @@ import {
   DEFAULT_BREAK_MINUTES,
   DEFAULT_WORK_MINUTES,
   generateAutoDisplayName,
+  generateAutoEmoji,
 } from "@/lib/room";
 import { createRoom, newParticipantId } from "@/lib/room-store";
 
@@ -32,10 +33,12 @@ export async function POST(request: Request) {
     typeof body.displayName === "string" && body.displayName.trim()
       ? body.displayName.trim()
       : generateAutoDisplayName();
+  const emoji = generateAutoEmoji();
   const participantId = newParticipantId();
   const room = await createRoom(workMinutes, breakMinutes, {
     id: participantId,
     displayName,
+    emoji,
   });
   return NextResponse.json({ room, participantId });
 }

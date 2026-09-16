@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe("room store persistence beyond process memory", () => {
   it("still finds a created room after in-process memory is cleared", async () => {
-    const created = await createRoom(25, 5, { id: "a", displayName: "Alice" });
+    const created = await createRoom(25, 5, { id: "a", displayName: "Alice", emoji: "😀" });
 
     dropProcessMemory();
 

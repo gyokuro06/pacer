@@ -6,6 +6,7 @@ import {
   proposeState,
   startSessionState,
   updateDisplayNameState,
+  updateEmojiState,
   updateRoomMinutesState,
   type Participant,
   type ProposalKind,
@@ -111,6 +112,20 @@ export async function updateDisplayName(
     throw new Error("ルームが見つかりません");
   }
   const updated = updateDisplayNameState(existing, participantId, displayName);
+  await persist(updated);
+  return updated;
+}
+
+export async function updateEmoji(
+  code: string,
+  participantId: string,
+  emoji: string,
+): Promise<Room> {
+  const existing = await getRoom(code);
+  if (!existing) {
+    throw new Error("ルームが見つかりません");
+  }
+  const updated = updateEmojiState(existing, participantId, emoji);
   await persist(updated);
   return updated;
 }

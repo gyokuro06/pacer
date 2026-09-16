@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { joinRoom, newParticipantId } from "@/lib/room-store";
+import { generateAutoEmoji } from "@/lib/room";
 
 export const runtime = "nodejs";
 
@@ -13,10 +14,12 @@ export async function POST(request: Request, { params }: Params) {
   if (!displayName) {
     return NextResponse.json({ error: "表示名は必須です" }, { status: 400 });
   }
+  const emoji = generateAutoEmoji();
   try {
     const { room, participantId } = await joinRoom(code, {
       id: newParticipantId(),
       displayName,
+      emoji,
     });
     return NextResponse.json({ room, participantId });
   } catch (error) {
