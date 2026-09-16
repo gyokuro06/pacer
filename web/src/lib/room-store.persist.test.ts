@@ -15,12 +15,12 @@ afterEach(() => {
 });
 
 describe("room store persistence beyond process memory", () => {
-  it("still finds a created room after in-process memory is cleared", () => {
-    const created = createRoom(25, 5, { id: "a", displayName: "Alice" });
+  it("still finds a created room after in-process memory is cleared", async () => {
+    const created = await createRoom(25, 5, { id: "a", displayName: "Alice" });
 
     dropProcessMemory();
 
-    const found = getRoom(created.code);
+    const found = await getRoom(created.code);
     assert.ok(
       found,
       "room must survive beyond a single Node process heap (file/sqlite/kv/db)",

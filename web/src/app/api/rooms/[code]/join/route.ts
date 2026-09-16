@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "表示名は必須です" }, { status: 400 });
   }
   try {
-    const { room, participantId } = joinRoom(code, {
+    const { room, participantId } = await joinRoom(code, {
       id: newParticipantId(),
       displayName,
     });

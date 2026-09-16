@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "表示名は必須です" }, { status: 400 });
   }
   const participantId = newParticipantId();
-  const room = createRoom(workMinutes, breakMinutes, {
+  const room = await createRoom(workMinutes, breakMinutes, {
     id: participantId,
     displayName,
   });

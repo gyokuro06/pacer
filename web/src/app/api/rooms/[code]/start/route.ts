@@ -8,7 +8,7 @@ type Params = { params: Promise<{ code: string }> };
 export async function POST(_request: Request, { params }: Params) {
   const { code } = await params;
   try {
-    const room = startRoom(code);
+    const room = await startRoom(code);
     return NextResponse.json({ room });
   } catch (error) {
     const message = error instanceof Error ? error.message : "開始に失敗しました";

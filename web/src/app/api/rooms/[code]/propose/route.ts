@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: Params) {
   const body = (await request.json()) as { kind?: ProposalKind };
   const kind = body.kind ?? "break";
   try {
-    const room = propose(code, kind);
+    const room = await propose(code, kind);
     return NextResponse.json({ room });
   } catch (error) {
     const message = error instanceof Error ? error.message : "提案に失敗しました";
