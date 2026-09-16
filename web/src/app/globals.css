@@ -1,0 +1,50 @@
+:root {
+  --background: #f3efe6;
+  --surface: #fffdf8;
+  --foreground: #1c2a24;
+  --muted: #5c6b63;
+  --border: #c9d0c6;
+  --accent: #1f6f5b;
+  --accent-soft: #9ec9b6;
+  --accent-contrast: #f7fff9;
+  --danger: #9b2c2c;
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans), "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
