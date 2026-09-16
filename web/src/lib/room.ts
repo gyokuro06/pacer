@@ -15,10 +15,13 @@ export type Room = {
   phase: Phase;
   phaseEndsAt: number | null;
   pendingProposal: ProposalKind | null;
+  lastActivityAt: number;
 };
 
 export const MIN_PARTICIPANTS_TO_START = 2;
 export const MAX_PARTICIPANTS = 4;
+export const SESSION_REJOIN_TTL_HOURS = 24;
+export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -61,11 +64,20 @@ export function canStart(room: Room): boolean {
   );
 }
 
+export function isRoomExpired(
+  room: Room,
+  now = Date.now(),
+  ttlMs = SESSION_REJOIN_TTL_MS,
+): boolean {
+  return now - room.lastActivityAt >= ttlMs;
+}
+
 export function createRoomState(
   workMinutes: number,
   breakMinutes: number,
   creator: Participant,
   code = generateRoomCode(),
+  now = Date.now(),
 ): Room {
   return {
     code,
@@ -75,22 +87,39 @@ export function createRoomState(
     phase: "waiting",
     phaseEndsAt: null,
     pendingProposal: null,
+    lastActivityAt: now,
   };
 }
 
 export function joinRoomState(
   room: Room,
   participant: Participant,
-): Room {
-  if (room.participants.some((p) => p.id === participant.id)) {
-    return room;
+  now = Date.now(),
+  ttlMs = SESSION_REJOIN_TTL_MS,
+): { room: Room; participantId: string } {
+  if (isRoomExpired(room, now, ttlMs)) {
+    throw new Error("ルームが見つかりません");
+  }
+  const byId = room.participants.find((p) => p.id === participant.id);
+  if (byId) {
+    return { room: { ...room, lastActivityAt: now }, participantId: byId.id };
+  }
+  const byName = room.participants.find(
+    (p) => p.displayName === participant.displayName,
+  );
+  if (byName) {
+    return { room: { ...room, lastActivityAt: now }, participantId: byName.id };
   }
   if (room.participants.length >= MAX_PARTICIPANTS) {
     throw new Error("ルームは満員です");
   }
   return {
-    ...room,
-    participants: [...room.participants, participant],
+    room: {
+      ...room,
+      participants: [...room.participants, participant],
+      lastActivityAt: now,
+    },
+    participantId: participant.id,
   };
 }
 
@@ -103,10 +132,15 @@ export function startSessionState(room: Room, now = Date.now()): Room {
     phase: "work",
     phaseEndsAt: now + room.workMinutes * 60_000,
     pendingProposal: null,
+    lastActivityAt: now,
   };
 }
 
-export function proposeState(room: Room, kind: ProposalKind): Room {
+export function proposeState(
+  room: Room,
+  kind: ProposalKind,
+  now = Date.now(),
+): Room {
   if (room.phase === "waiting") {
     throw new Error("セッション開始前は提案できません");
   }
@@ -116,7 +150,7 @@ export function proposeState(room: Room, kind: ProposalKind): Room {
   if (kind === "work" && room.phase !== "break") {
     throw new Error("休憩中のみ作業再開を提案できます");
   }
-  return { ...room, pendingProposal: kind };
+  return { ...room, pendingProposal: kind, lastActivityAt: now };
 }
 
 export function confirmProposalState(room: Room, now = Date.now()): Room {
@@ -129,6 +163,7 @@ export function confirmProposalState(room: Room, now = Date.now()): Room {
       phase: "break",
       phaseEndsAt: now + room.breakMinutes * 60_000,
       pendingProposal: null,
+      lastActivityAt: now,
     };
   }
   return {
@@ -136,5 +171,6 @@ export function confirmProposalState(room: Room, now = Date.now()): Room {
     phase: "work",
     phaseEndsAt: now + room.workMinutes * 60_000,
     pendingProposal: null,
+    lastActivityAt: now,
   };
 }

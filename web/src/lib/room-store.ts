@@ -1,6 +1,7 @@
 import {
   confirmProposalState,
   createRoomState,
+  isRoomExpired,
   joinRoomState,
   proposeState,
   startSessionState,
@@ -20,8 +21,14 @@ function rooms(): Map<string, Room> {
   return globalStore.__pacerRooms;
 }
 
-export function getRoom(code: string): Room | undefined {
-  return rooms().get(code.toUpperCase());
+export function getRoom(code: string, now = Date.now()): Room | undefined {
+  const room = rooms().get(code.toUpperCase());
+  if (!room) return undefined;
+  if (isRoomExpired(room, now)) {
+    rooms().delete(room.code);
+    return undefined;
+  }
+  return room;
 }
 
 export function createRoom(
@@ -34,14 +41,17 @@ export function createRoom(
   return room;
 }
 
-export function joinRoom(code: string, participant: Participant): Room {
+export function joinRoom(
+  code: string,
+  participant: Participant,
+): { room: Room; participantId: string } {
   const existing = getRoom(code);
   if (!existing) {
     throw new Error("ルームが見つかりません");
   }
-  const updated = joinRoomState(existing, participant);
-  rooms().set(updated.code, updated);
-  return updated;
+  const result = joinRoomState(existing, participant);
+  rooms().set(result.room.code, result.room);
+  return result;
 }
 
 export function startRoom(code: string): Room {

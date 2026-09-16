@@ -14,8 +14,10 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "表示名は必須です" }, { status: 400 });
   }
   try {
-    const participantId = newParticipantId();
-    const room = joinRoom(code, { id: participantId, displayName });
+    const { room, participantId } = joinRoom(code, {
+      id: newParticipantId(),
+      displayName,
+    });
     return NextResponse.json({ room, participantId });
   } catch (error) {
     const message = error instanceof Error ? error.message : "参加に失敗しました";
