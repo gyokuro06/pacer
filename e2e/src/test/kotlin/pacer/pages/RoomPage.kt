@@ -4,9 +4,40 @@ import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.assertions.PlaywrightAssertions
 import com.microsoft.playwright.options.AriaRole
+import java.util.regex.Pattern
 
 class RoomPage(page: Page) : BasePage(page) {
     private val main = playwrightPage.getByRole(AriaRole.MAIN)
+
+    fun assertOnRoomPage() {
+        playwrightPage.waitForURL(Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
+    }
+
+    fun assertWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
+        PlaywrightAssertions.assertThat(workMinutesInput()).hasValue(workMinutes)
+        PlaywrightAssertions.assertThat(breakMinutesInput()).hasValue(breakMinutes)
+    }
+
+    fun assertShareUrlMatchesAddressBar() {
+        PlaywrightAssertions.assertThat(shareUrl()).isVisible()
+        val displayed = shareUrl().innerText().trim().ifEmpty { shareUrl().inputValue().trim() }
+        val addressBar = playwrightPage.url().trimEnd('/')
+        val normalizedDisplayed = displayed.trimEnd('/')
+        require(normalizedDisplayed == addressBar) {
+            "共有URLがアドレスバーと一致しません: displayed=$displayed addressBar=${playwrightPage.url()}"
+        }
+    }
+
+    fun copyShareUrlAndAssertClipboard() {
+        playwrightPage.context().grantPermissions(listOf("clipboard-read", "clipboard-write"))
+        val expected =
+            shareUrl().innerText().trim().ifEmpty { shareUrl().inputValue().trim() }.trimEnd('/')
+        copyShareUrlButton().click()
+        val actual = (playwrightPage.evaluate("navigator.clipboard.readText()") as String).trim().trimEnd('/')
+        require(actual == expected) {
+            "クリップボードが共有URLと一致しません: clipboard=$actual expected=$expected"
+        }
+    }
 
     fun readRoomCode(): String {
         PlaywrightAssertions.assertThat(roomCode()).isVisible()
@@ -74,6 +105,18 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun roomCode(): Locator =
         main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
+
+    private fun shareUrl(): Locator =
+        main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("共有URL"))
+
+    private fun copyShareUrlButton(): Locator =
+        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("共有URLをコピー"))
+
+    private fun workMinutesInput(): Locator =
+        main.getByRole(AriaRole.SPINBUTTON, Locator.GetByRoleOptions().setName("作業（分）"))
+
+    private fun breakMinutesInput(): Locator =
+        main.getByRole(AriaRole.SPINBUTTON, Locator.GetByRoleOptions().setName("休憩（分）"))
 
     private fun startButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("スタート"))
