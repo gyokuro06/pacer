@@ -18,12 +18,25 @@ export type Room = {
   lastActivityAt: number;
 };
 
-export const MIN_PARTICIPANTS_TO_START = 2;
+export const MIN_PARTICIPANTS_TO_START = 1;
 export const MAX_PARTICIPANTS = 4;
+export const DEFAULT_WORK_MINUTES = 60;
+export const DEFAULT_BREAK_MINUTES = 10;
 export const SESSION_REJOIN_TTL_HOURS = 24;
 export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export const FUNNY_NICKNAMES = [
+  "ねこぱんつ",
+  "うどん侍",
+  "もちもち太郎",
+  "かりんとう姫",
+  "ささみ騎士",
+  "ぷりん将軍",
+  "やきとり船長",
+  "めんだこ博士",
+] as const;
 
 export function generateRoomCode(length = 6): string {
   let code = "";
@@ -31,6 +44,13 @@ export function generateRoomCode(length = 6): string {
     code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
   }
   return code;
+}
+
+export function generateFunnyNickname(
+  random = Math.random,
+): string {
+  const index = Math.floor(random() * FUNNY_NICKNAMES.length);
+  return FUNNY_NICKNAMES[index] ?? FUNNY_NICKNAMES[0];
 }
 
 export function formatRemainingMs(remainingMs: number): string {
@@ -134,6 +154,49 @@ export function startSessionState(room: Room, now = Date.now()): Room {
     pendingProposal: null,
     lastActivityAt: now,
   };
+}
+
+export function updateRoomMinutesState(
+  room: Room,
+  workMinutes: number,
+  breakMinutes: number,
+  now = Date.now(),
+): Room {
+  if (room.phase !== "waiting") {
+    throw new Error("待機中のみ分数を変更できます");
+  }
+  if (!Number.isFinite(workMinutes) || workMinutes <= 0) {
+    throw new Error("作業時間が不正です");
+  }
+  if (!Number.isFinite(breakMinutes) || breakMinutes <= 0) {
+    throw new Error("休憩時間が不正です");
+  }
+  return {
+    ...room,
+    workMinutes,
+    breakMinutes,
+    lastActivityAt: now,
+  };
+}
+
+export function updateDisplayNameState(
+  room: Room,
+  participantId: string,
+  displayName: string,
+  now = Date.now(),
+): Room {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    throw new Error("表示名は必須です");
+  }
+  const index = room.participants.findIndex((p) => p.id === participantId);
+  if (index < 0) {
+    throw new Error("参加者が見つかりません");
+  }
+  const participants = room.participants.map((p, i) =>
+    i === index ? { ...p, displayName: trimmed } : p,
+  );
+  return { ...room, participants, lastActivityAt: now };
 }
 
 export function proposeState(

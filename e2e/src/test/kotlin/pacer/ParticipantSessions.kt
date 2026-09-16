@@ -20,6 +20,7 @@ object ParticipantSessions {
         val url = config.target.url.toString()
         println("[STEP] participant=$participant open home url=$url")
         page.navigate(url)
+        page.waitForURL(java.util.regex.Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
         return page
     }
 

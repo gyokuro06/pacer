@@ -4,12 +4,15 @@ import {
   confirmProposalState,
   createRoomState,
   formatRemainingMs,
+  FUNNY_NICKNAMES,
+  generateFunnyNickname,
   isRoomExpired,
   joinRoomState,
   MAX_PARTICIPANTS,
   proposeState,
   SESSION_REJOIN_TTL_MS,
   startSessionState,
+  updateRoomMinutesState,
 } from "./room";
 
 describe("formatRemainingMs", () => {
@@ -26,13 +29,49 @@ describe("formatRemainingMs", () => {
   });
 });
 
+describe("generateFunnyNickname", () => {
+  it("picks from the funny nickname list", () => {
+    const name = generateFunnyNickname(() => 0);
+    assert.equal(name, FUNNY_NICKNAMES[0]);
+    assert.ok(FUNNY_NICKNAMES.includes(name as (typeof FUNNY_NICKNAMES)[number]));
+  });
+
+  it("never returns empty", () => {
+    for (let i = 0; i < FUNNY_NICKNAMES.length; i += 1) {
+      const name = generateFunnyNickname(() => i / FUNNY_NICKNAMES.length);
+      assert.ok(name.length > 0);
+    }
+  });
+});
+
 describe("session flow", () => {
   const alice = { id: "a", displayName: "Alice" };
   const bob = { id: "b", displayName: "Bob" };
 
-  it("rejects start with fewer than two participants", () => {
-    const room = createRoomState(25, 5, alice, "ABCDEF");
+  it("allows solo start with one participant", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    const now = 1_000_000;
+    const work = startSessionState(room, now);
+    assert.equal(work.phase, "work");
+    assert.equal(work.phaseEndsAt, now + 60 * 60_000);
+  });
+
+  it("rejects start with zero participants", () => {
+    const room = {
+      ...createRoomState(25, 5, alice, "ABCDEF"),
+      participants: [],
+    };
     assert.throws(() => startSessionState(room), /開始条件/);
+  });
+
+  it("updates minutes only while waiting", () => {
+    const waiting = createRoomState(60, 10, alice, "ABCDEF");
+    const updated = updateRoomMinutesState(waiting, 25, 5);
+    assert.equal(updated.workMinutes, 25);
+    assert.equal(updated.breakMinutes, 5);
+
+    const work = startSessionState(updated, 1_000_000);
+    assert.throws(() => updateRoomMinutesState(work, 30, 5), /待機中のみ/);
   });
 
   it("starts work then confirms break proposal", () => {

@@ -13,6 +13,28 @@ class RoomPage(page: Page) : BasePage(page) {
         playwrightPage.waitForURL(Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
     }
 
+    fun setDisplayName(displayName: String) {
+        PlaywrightAssertions.assertThat(displayNameInput()).isVisible()
+        displayNameInput().fill(displayName)
+        displayNameInput().blur()
+    }
+
+    fun setWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
+        workMinutesInput().fill(workMinutes)
+        workMinutesInput().blur()
+        breakMinutesInput().fill(breakMinutes)
+        breakMinutesInput().blur()
+        PlaywrightAssertions.assertThat(workMinutesInput()).hasValue(workMinutes)
+        PlaywrightAssertions.assertThat(breakMinutesInput()).hasValue(breakMinutes)
+    }
+
+    fun joinWithDisplayName(displayName: String) {
+        PlaywrightAssertions.assertThat(joinButton()).isVisible()
+        joinDisplayNameInput().fill(displayName)
+        joinButton().click()
+        PlaywrightAssertions.assertThat(joinButton()).hasCount(0)
+    }
+
     fun assertWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
         PlaywrightAssertions.assertThat(workMinutesInput()).hasValue(workMinutes)
         PlaywrightAssertions.assertThat(breakMinutesInput()).hasValue(breakMinutes)
@@ -117,6 +139,15 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun breakMinutesInput(): Locator =
         main.getByRole(AriaRole.SPINBUTTON, Locator.GetByRoleOptions().setName("休憩（分）"))
+
+    private fun displayNameInput(): Locator =
+        main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
+
+    private fun joinDisplayNameInput(): Locator =
+        main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
+
+    private fun joinButton(): Locator =
+        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加"))
 
     private fun startButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("スタート"))
