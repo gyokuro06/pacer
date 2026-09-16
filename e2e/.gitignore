@@ -1,0 +1,7 @@
+.gauge/
+logs/
+reports/
+gauge_bin/
+target/
+.idea/
+node_modules/
