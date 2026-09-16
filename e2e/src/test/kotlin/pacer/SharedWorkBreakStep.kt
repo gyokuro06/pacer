@@ -41,6 +41,20 @@ class SharedWorkBreakStep {
         RoomPage(ParticipantSessions.page(name)).assertWorkPhaseWithRemainingTime()
     }
 
+    @Step("参加者 <name> の残り時間を記憶する")
+    fun 参加者の残り時間を記憶する(name: String) {
+        val remaining = RoomPage(ParticipantSessions.page(name)).readRemainingTime()
+        ParticipantSessions.rememberRemainingTime(remaining)
+    }
+
+    @Step("参加者 <name> に作業フェーズと記憶した残り時間が復元されている")
+    fun 参加者に作業フェーズと記憶した残り時間が復元されている(name: String) {
+        RoomPage(ParticipantSessions.page(name)).assertWorkPhaseWithRestoredRemainingTime(
+            ParticipantSessions.rememberedRemainingMmSs(),
+            ParticipantSessions.rememberedRemainingAtMs(),
+        )
+    }
+
     @Step("参加者 <name> が休憩を提案する")
     fun 参加者が休憩を提案する(name: String) {
         RoomPage(ParticipantSessions.page(name)).proposeBreak()

@@ -22,6 +22,36 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(remainingTime()).isVisible()
     }
 
+    fun readRemainingTime(): String {
+        PlaywrightAssertions.assertThat(remainingTime()).isVisible()
+        return remainingTime().innerText().trim()
+    }
+
+    fun assertWorkPhaseWithRestoredRemainingTime(
+        rememberedMmSs: String,
+        rememberedAtMs: Long,
+        toleranceSeconds: Long = 5,
+    ) {
+        PlaywrightAssertions.assertThat(phaseLabel("作業")).isVisible()
+        val actualMmSs = readRemainingTime()
+        val actualSeconds = parseMmSsToSeconds(actualMmSs)
+        val rememberedSeconds = parseMmSsToSeconds(rememberedMmSs)
+        val elapsedSeconds = (System.currentTimeMillis() - rememberedAtMs) / 1000.0
+        val expectedSeconds = rememberedSeconds - elapsedSeconds
+        val delta = kotlin.math.abs(actualSeconds - expectedSeconds)
+        require(delta <= toleranceSeconds) {
+            "残り時間が復元されていません: actual=$actualMmSs " +
+                "remembered=$rememberedMmSs elapsed≈${"%.1f".format(elapsedSeconds)}s " +
+                "delta≈${"%.1f".format(delta)}s (tolerance=${toleranceSeconds}s)"
+        }
+    }
+
+    private fun parseMmSsToSeconds(mmSs: String): Double {
+        val parts = mmSs.split(":")
+        require(parts.size == 2) { "残り時間の形式が不正です: $mmSs" }
+        return parts[0].toDouble() * 60 + parts[1].toDouble()
+    }
+
     fun proposeBreak() {
         proposeBreakButton().click()
     }

@@ -8,6 +8,8 @@ object ParticipantSessions {
     private val contexts = mutableMapOf<String, BrowserContext>()
     private val pages = mutableMapOf<String, Page>()
     private var sharedRoomCode: String? = null
+    private var rememberedRemainingMmSs: String? = null
+    private var rememberedRemainingAtMs: Long? = null
 
     fun openHome(participant: String, browser: Browser): Page {
         close(participant)
@@ -32,6 +34,19 @@ object ParticipantSessions {
         sharedRoomCode?.takeIf { it.isNotEmpty() }
             ?: error("共有ルームコードがまだありません")
 
+    fun rememberRemainingTime(mmSs: String) {
+        rememberedRemainingMmSs = mmSs.trim()
+        rememberedRemainingAtMs = System.currentTimeMillis()
+    }
+
+    fun rememberedRemainingMmSs(): String =
+        rememberedRemainingMmSs?.takeIf { it.isNotEmpty() }
+            ?: error("残り時間がまだ記憶されていません")
+
+    fun rememberedRemainingAtMs(): Long =
+        rememberedRemainingAtMs
+            ?: error("残り時間がまだ記憶されていません")
+
     fun clear() {
         contexts.values.forEach { context ->
             runCatching { context.close() }
@@ -39,6 +54,8 @@ object ParticipantSessions {
         contexts.clear()
         pages.clear()
         sharedRoomCode = null
+        rememberedRemainingMmSs = null
+        rememberedRemainingAtMs = null
     }
 
     private fun close(participant: String) {
