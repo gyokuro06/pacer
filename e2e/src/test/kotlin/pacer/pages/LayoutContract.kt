@@ -46,15 +46,16 @@ object LayoutContract {
 
     fun assertHomePrimaryButtons(page: Page) {
         val main = page.getByRole(AriaRole.MAIN)
+        // `/` auto-creates and lands on the room; primary actions live there.
         assertMinTouchTarget(
             page,
-            main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("ルームを作成")),
-            "ルームを作成",
+            main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("共有URLをコピー")),
+            "共有URLをコピー",
         )
         assertMinTouchTarget(
             page,
-            main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加")),
-            "参加",
+            main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("スタート")),
+            "スタート",
         )
     }
 

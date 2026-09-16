@@ -1,6 +1,7 @@
 # レスポンシブレイアウト
 
-// Home / Room 共有の単一カラム・流体 CSS。viewport 切替・リサイズシナリオは Out of scope。
+// `/` は即ルーム作成して /room/[code] に着地する。Home / Room 共有の単一カラム・流体 CSS。
+// viewport 切替・リサイズシナリオは Out of scope。
 // デフォルト Gauge viewport（Playwright 既定 1280px 幅）で観測可能な契約:
 // - モバイル向け viewport meta（device-width）
 // - 横スクロールなし
