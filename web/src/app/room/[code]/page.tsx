@@ -127,6 +127,19 @@ export default function RoomPage() {
             </button>
           ) : null}
 
+          {room.phase === "break" && room.pendingProposal == null ? (
+            <button
+              type="button"
+              onClick={() =>
+                void postAction(`/api/rooms/${encodeURIComponent(code)}/propose`, {
+                  kind: "work",
+                })
+              }
+            >
+              再開を提案
+            </button>
+          ) : null}
+
           {room.pendingProposal != null ? (
             <button
               type="button"

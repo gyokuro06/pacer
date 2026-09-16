@@ -18,9 +18,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "休憩時間が不正です" }, { status: 400 });
   }
   const displayName =
-    typeof body.displayName === "string" && body.displayName.trim()
-      ? body.displayName.trim()
-      : "ホスト";
+    typeof body.displayName === "string" ? body.displayName.trim() : "";
+  if (!displayName) {
+    return NextResponse.json({ error: "表示名は必須です" }, { status: 400 });
+  }
   const participantId = newParticipantId();
   const room = createRoom(workMinutes, breakMinutes, {
     id: participantId,

@@ -10,6 +10,7 @@ function storeParticipant(code: string, participantId: string) {
 export default function HomePage() {
   const [workMinutes, setWorkMinutes] = useState("25");
   const [breakMinutes, setBreakMinutes] = useState("5");
+  const [createDisplayName, setCreateDisplayName] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,7 @@ export default function HomePage() {
         body: JSON.stringify({
           workMinutes: Number(workMinutes),
           breakMinutes: Number(breakMinutes),
+          displayName: createDisplayName,
         }),
       });
       const data = await response.json();
@@ -71,6 +73,16 @@ export default function HomePage() {
 
         <form className={styles.panel} onSubmit={onCreate}>
           <h2>ルームを作成</h2>
+          <label className={styles.field}>
+            <span>表示名</span>
+            <input
+              type="text"
+              aria-label="表示名"
+              value={createDisplayName}
+              onChange={(e) => setCreateDisplayName(e.target.value)}
+              required
+            />
+          </label>
           <label className={styles.field}>
             <span>作業（分）</span>
             <input
