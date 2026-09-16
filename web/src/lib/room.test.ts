@@ -10,6 +10,7 @@ import {
   joinRoomState,
   MAX_PARTICIPANTS,
   proposeState,
+  requireRoomMember,
   SESSION_REJOIN_TTL_MS,
   startSessionState,
   updateRoomMinutesState,
@@ -41,6 +42,26 @@ describe("generateFunnyNickname", () => {
       const name = generateFunnyNickname(() => i / FUNNY_NICKNAMES.length);
       assert.ok(name.length > 0);
     }
+  });
+});
+
+describe("requireRoomMember", () => {
+  const alice = { id: "a", displayName: "Alice" };
+
+  it("returns participant id when member", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    assert.equal(requireRoomMember(room, "a"), "a");
+  });
+
+  it("rejects missing participant id", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    assert.throws(() => requireRoomMember(room, ""), /参加者IDは必須/);
+    assert.throws(() => requireRoomMember(room, null), /参加者IDは必須/);
+  });
+
+  it("rejects non-member", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    assert.throws(() => requireRoomMember(room, "outsider"), /参加者が見つかりません/);
   });
 });
 

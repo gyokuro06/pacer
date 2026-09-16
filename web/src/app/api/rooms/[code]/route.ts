@@ -4,10 +4,18 @@ import {
   updateDisplayName,
   updateRoomMinutes,
 } from "@/lib/room-store";
+import { requireRoomMember } from "@/lib/room";
 
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ code: string }> };
+
+function errorStatus(message: string): number {
+  if (message.includes("参加者ID")) return 400;
+  if (message.includes("参加者") && message.includes("見つかりません")) return 403;
+  if (message.includes("見つかりません")) return 404;
+  return 400;
+}
 
 export async function GET(_request: Request, { params }: Params) {
   const { code } = await params;
@@ -26,20 +34,13 @@ export async function PATCH(request: Request, { params }: Params) {
     breakMinutes?: number;
     displayName?: string;
   };
-  const participantId =
-    typeof body.participantId === "string" ? body.participantId.trim() : "";
-  if (!participantId) {
-    return NextResponse.json({ error: "参加者IDは必須です" }, { status: 400 });
-  }
 
   try {
     let room = await getRoom(code);
     if (!room) {
       return NextResponse.json({ error: "ルームが見つかりません" }, { status: 404 });
     }
-    if (!room.participants.some((p) => p.id === participantId)) {
-      return NextResponse.json({ error: "参加者が見つかりません" }, { status: 403 });
-    }
+    const participantId = requireRoomMember(room, body.participantId);
 
     if (body.workMinutes !== undefined || body.breakMinutes !== undefined) {
       const workMinutes = Number(body.workMinutes ?? room.workMinutes);
@@ -52,7 +53,6 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ room });
   } catch (error) {
     const message = error instanceof Error ? error.message : "更新に失敗しました";
-    const status = message.includes("見つかりません") ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: errorStatus(message) });
   }
 }

@@ -84,6 +84,20 @@ export function canStart(room: Room): boolean {
   );
 }
 
+export function requireRoomMember(
+  room: Room,
+  participantId: string | undefined | null,
+): string {
+  const id = typeof participantId === "string" ? participantId.trim() : "";
+  if (!id) {
+    throw new Error("参加者IDは必須です");
+  }
+  if (!room.participants.some((p) => p.id === id)) {
+    throw new Error("参加者が見つかりません");
+  }
+  return id;
+}
+
 export function isRoomExpired(
   room: Room,
   now = Date.now(),

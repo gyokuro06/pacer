@@ -81,12 +81,16 @@ export default function RoomPage() {
     };
   }, [refresh]);
 
-  async function postAction(path: string, body?: unknown) {
+  async function postAction(path: string, body?: Record<string, unknown>) {
+    if (!participantId) {
+      setError("参加が必要です");
+      return;
+    }
     setError(null);
     const response = await fetch(path, {
       method: "POST",
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, participantId }),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -132,9 +136,15 @@ export default function RoomPage() {
 
   async function copyShareUrl() {
     const url = shareUrl || window.location.href;
-    await navigator.clipboard.writeText(url);
-    setCopyDone(true);
-    window.setTimeout(() => setCopyDone(false), 1500);
+    try {
+      await navigator.clipboard.writeText(url);
+      setError(null);
+      setCopyDone(true);
+      window.setTimeout(() => setCopyDone(false), 1500);
+    } catch {
+      setCopyDone(false);
+      setError("共有URLのコピーに失敗しました");
+    }
   }
 
   const isParticipant = useMemo(() => {
@@ -177,8 +187,26 @@ export default function RoomPage() {
           <div role="status" aria-label="共有URL" className={styles.shareUrl}>
             {shareUrl}
           </div>
-          <button type="button" onClick={() => void copyShareUrl()}>
-            共有URLをコピー
+          <button
+            type="button"
+            className={styles.copyButton}
+            aria-label="共有URLをコピー"
+            onClick={() => void copyShareUrl()}
+          >
+            <svg
+              aria-hidden="true"
+              width="1.25em"
+              height="1.25em"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
           </button>
           {copyDone ? <span className={styles.copyHint}>コピーしました</span> : null}
         </div>
@@ -206,7 +234,7 @@ export default function RoomPage() {
               <span>表示名</span>
               <input
                 type="text"
-                aria-label="表示名"
+                aria-label="参加用の表示名"
                 value={joinName}
                 onChange={(e) => setJoinName(e.target.value)}
                 required

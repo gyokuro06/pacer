@@ -40,6 +40,25 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(breakMinutesInput()).hasValue(breakMinutes)
     }
 
+    fun assertWorkAndBreakMinutesReadOnly(workMinutes: String, breakMinutes: String) {
+        assertWorkAndBreakMinutes(workMinutes, breakMinutes)
+        PlaywrightAssertions.assertThat(workMinutesInput()).isDisabled()
+        PlaywrightAssertions.assertThat(breakMinutesInput()).isDisabled()
+    }
+
+    fun assertFunnyNicknameVisible() {
+        PlaywrightAssertions.assertThat(displayNameInput()).isVisible()
+        val name = displayNameInput().inputValue().trim()
+        require(name.isNotEmpty()) { "おもしろ仮名が表示されていません" }
+        require(FUNNY_NICKNAMES.contains(name)) {
+            "表示名がおもしろ仮名一覧にありません: $name"
+        }
+    }
+
+    fun assertStartButtonAbsent() {
+        PlaywrightAssertions.assertThat(startButton()).hasCount(0)
+    }
+
     fun assertShareUrlMatchesAddressBar() {
         PlaywrightAssertions.assertThat(shareUrl()).isVisible()
         val displayed = shareUrl().innerText().trim().ifEmpty { shareUrl().inputValue().trim() }
@@ -144,7 +163,7 @@ class RoomPage(page: Page) : BasePage(page) {
         main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
 
     private fun joinDisplayNameInput(): Locator =
-        main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
+        main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("参加用の表示名"))
 
     private fun joinButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加"))
@@ -167,4 +186,17 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun confirmProposalButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("提案を確定"))
+
+    companion object {
+        private val FUNNY_NICKNAMES = setOf(
+            "ねこぱんつ",
+            "うどん侍",
+            "もちもち太郎",
+            "かりんとう姫",
+            "ささみ騎士",
+            "ぷりん将軍",
+            "やきとり船長",
+            "めんだこ博士",
+        )
+    }
 }
