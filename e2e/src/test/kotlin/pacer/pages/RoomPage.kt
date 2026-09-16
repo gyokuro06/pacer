@@ -144,6 +144,46 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
     }
 
+    fun assertOwnAvatarVisible() {
+        PlaywrightAssertions.assertThat(participantsList()).isVisible()
+        val avatars = participantAvatars()
+        PlaywrightAssertions.assertThat(avatars).not().hasCount(0)
+    }
+
+    fun assertYouLabelVisible() {
+        PlaywrightAssertions.assertThat(youLabel()).isVisible()
+    }
+
+    fun assertParticipantsCount(count: Int) {
+        PlaywrightAssertions.assertThat(participantAvatars()).hasCount(count)
+    }
+
+    fun assertParticipantNamesVisible(vararg names: String) {
+        for (name in names) {
+            PlaywrightAssertions.assertThat(participantName(name)).isVisible()
+        }
+    }
+
+    fun changeOwnEmoji(emoji: String) {
+        ownAvatar().click()
+        emojiPicker().waitFor()
+        emojiInput().fill(emoji)
+        emojiInput().press("Enter")
+    }
+
+    fun assertOwnEmojiVisible(emoji: String) {
+        PlaywrightAssertions.assertThat(ownAvatar()).containsText(emoji)
+    }
+
+    fun assertEmojisVisible(vararg emojis: String) {
+        for (emoji in emojis) {
+            val avatarWithEmoji = participantAvatars().filter(
+                Locator.FilterOptions().setHasText(emoji)
+            )
+            PlaywrightAssertions.assertThat(avatarWithEmoji).hasCount(1)
+        }
+    }
+
     private fun roomCode(): Locator =
         main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
 
@@ -186,6 +226,27 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun confirmProposalButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("提案を確定"))
+
+    private fun participantsList(): Locator =
+        main.getByRole(AriaRole.LIST, Locator.GetByRoleOptions().setName("参加者一覧"))
+
+    private fun participantAvatars(): Locator =
+        participantsList().getByRole(AriaRole.LISTITEM)
+
+    private fun youLabel(): Locator =
+        main.getByText("You")
+
+    private fun participantName(name: String): Locator =
+        participantsList().getByText(name)
+
+    private fun ownAvatar(): Locator =
+        participantsList().locator("[data-own-avatar]")
+
+    private fun emojiPicker(): Locator =
+        playwrightPage.getByRole(AriaRole.DIALOG, Locator.GetByRoleOptions().setName("絵文字を選択"))
+
+    private fun emojiInput(): Locator =
+        emojiPicker().getByRole(AriaRole.TEXTBOX)
 
     companion object {
         private val AUTO_DISPLAY_NAMES = setOf(
