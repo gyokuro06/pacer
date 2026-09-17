@@ -21,6 +21,21 @@ object ParticipantSessions {
         val url = config.target.url.toString()
         println("[STEP] participant=$participant open home url=$url")
         page.navigate(url)
+        page.waitForURL(java.util.regex.Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
+        return page
+    }
+
+    fun openSharedRoom(participant: String, browser: Browser, roomCode: String): Page {
+        close(participant)
+        val context = browser.newContext()
+        val page = context.newPage()
+        contexts[participant] = context
+        pages[participant] = page
+        val origin = config.target.url.toString().trimEnd('/')
+        val url = "$origin/room/${roomCode.trim()}"
+        println("[STEP] participant=$participant open shared room url=$url")
+        page.navigate(url)
+        page.waitForURL(java.util.regex.Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
         return page
     }
 

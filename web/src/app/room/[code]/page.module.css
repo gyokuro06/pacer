@@ -20,7 +20,7 @@
 
 .brand {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
   letter-spacing: -0.04em;
   line-height: 1;
 }
@@ -32,25 +32,27 @@
   padding: 0.4rem 0;
 }
 
-.phase {
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-
-.timer {
-  font-family: var(--font-mono);
-  font-size: clamp(2.5rem, 10vw, 3.5rem);
-  letter-spacing: 0.04em;
-  line-height: 1;
-}
-
-.actions {
+.share {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
-  margin-top: 0.5rem;
+  width: 100%;
 }
 
+.shareUrl {
+  flex: 1 1 12rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  word-break: break-all;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+}
+
+.copyButton,
+.join button,
 .actions button {
   font: inherit;
   min-height: 3rem;
@@ -62,9 +64,89 @@
   cursor: pointer;
 }
 
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  padding: 0.75rem;
+}
+
+.copyButton:disabled,
+.join button:disabled,
 .actions button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.copyHint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.field input {
+  font: inherit;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.field input:disabled {
+  opacity: 0.7;
+}
+
+.join {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.phase {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.timerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: clamp(1rem, 3vw, 1.75rem);
+  width: 100%;
+}
+
+.timer {
+  font-family: var(--font-mono);
+  font-size: clamp(2.5rem, 10vw, 3.5rem);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.timerPlaceholder {
+  min-height: 1rem;
+}
+
+.minutes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .participants {

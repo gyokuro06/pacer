@@ -7,6 +7,8 @@ import {
   joinRoomState,
   proposeState,
   startSessionState,
+  updateDisplayNameState,
+  updateRoomMinutesState,
   type ParticipantInput,
   type ProposalKind,
   type Room,
@@ -83,6 +85,34 @@ export async function startRoom(code: string): Promise<Room> {
     throw new Error("ルームが見つかりません");
   }
   const updated = startSessionState(existing);
+  await persist(updated);
+  return updated;
+}
+
+export async function updateRoomMinutes(
+  code: string,
+  workMinutes: number,
+  breakMinutes: number,
+): Promise<Room> {
+  const existing = await getRoom(code);
+  if (!existing) {
+    throw new Error("ルームが見つかりません");
+  }
+  const updated = updateRoomMinutesState(existing, workMinutes, breakMinutes);
+  await persist(updated);
+  return updated;
+}
+
+export async function updateDisplayName(
+  code: string,
+  participantId: string,
+  displayName: string,
+): Promise<Room> {
+  const existing = await getRoom(code);
+  if (!existing) {
+    throw new Error("ルームが見つかりません");
+  }
+  const updated = updateDisplayNameState(existing, participantId, displayName);
   await persist(updated);
   return updated;
 }

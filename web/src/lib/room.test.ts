@@ -6,14 +6,18 @@ import {
   confirmProposalState,
   createRoomState,
   formatRemainingMs,
+  AUTO_DISPLAY_NAMES,
+  generateAutoDisplayName,
   isRoomExpired,
   joinRoomState,
   MAX_PARTICIPANTS,
   PARTICIPANT_EMOJIS,
   pickUnusedEmoji,
   proposeState,
+  requireRoomMember,
   SESSION_REJOIN_TTL_MS,
   startSessionState,
+  updateRoomMinutesState,
 } from "./room";
 
 describe("formatRemainingMs", () => {
@@ -169,13 +173,69 @@ describe("changeParticipantDisplayNameState", () => {
   });
 });
 
+describe("generateAutoDisplayName", () => {
+  it("picks from the auto display name list", () => {
+    const name = generateAutoDisplayName(() => 0);
+    assert.equal(name, AUTO_DISPLAY_NAMES[0]);
+    assert.ok(AUTO_DISPLAY_NAMES.includes(name as (typeof AUTO_DISPLAY_NAMES)[number]));
+  });
+
+  it("never returns empty", () => {
+    for (let i = 0; i < AUTO_DISPLAY_NAMES.length; i += 1) {
+      const name = generateAutoDisplayName(() => i / AUTO_DISPLAY_NAMES.length);
+      assert.ok(name.length > 0);
+    }
+  });
+});
+
+describe("requireRoomMember", () => {
+  const alice = { id: "a", displayName: "Alice" };
+
+  it("returns participant id when member", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    assert.equal(requireRoomMember(room, "a"), "a");
+  });
+
+  it("rejects missing participant id", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    assert.throws(() => requireRoomMember(room, ""), /参加者IDは必須/);
+    assert.throws(() => requireRoomMember(room, null), /参加者IDは必須/);
+  });
+
+  it("rejects non-member", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    assert.throws(() => requireRoomMember(room, "outsider"), /参加者が見つかりません/);
+  });
+});
+
 describe("session flow", () => {
   const alice = { id: "a", displayName: "Alice" };
   const bob = { id: "b", displayName: "Bob" };
 
-  it("rejects start with fewer than two participants", () => {
-    const room = createRoomState(25, 5, alice, "ABCDEF");
+  it("allows solo start with one participant", () => {
+    const room = createRoomState(60, 10, alice, "ABCDEF");
+    const now = 1_000_000;
+    const work = startSessionState(room, now);
+    assert.equal(work.phase, "work");
+    assert.equal(work.phaseEndsAt, now + 60 * 60_000);
+  });
+
+  it("rejects start with zero participants", () => {
+    const room = {
+      ...createRoomState(25, 5, alice, "ABCDEF"),
+      participants: [],
+    };
     assert.throws(() => startSessionState(room), /開始条件/);
+  });
+
+  it("updates minutes only while waiting", () => {
+    const waiting = createRoomState(60, 10, alice, "ABCDEF");
+    const updated = updateRoomMinutesState(waiting, 25, 5);
+    assert.equal(updated.workMinutes, 25);
+    assert.equal(updated.breakMinutes, 5);
+
+    const work = startSessionState(updated, 1_000_000);
+    assert.throws(() => updateRoomMinutesState(work, 30, 5), /待機中のみ/);
   });
 
   it("starts work then confirms break proposal", () => {

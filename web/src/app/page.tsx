@@ -1,144 +1,122 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
+
+const HOME_ROOM_KEY = "pacer:homeRoom";
+const HOME_CREATE_INFLIGHT_KEY = "pacer:homeCreateInflight";
+
+type HomeRoomCache = { code: string; participantId: string };
 
 function storeParticipant(code: string, participantId: string) {
   sessionStorage.setItem(`pacer:${code}:participantId`, participantId);
 }
 
+function readHomeRoomCache(): HomeRoomCache | null {
+  const raw = sessionStorage.getItem(HOME_ROOM_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as HomeRoomCache;
+    if (
+      typeof parsed?.code === "string" &&
+      parsed.code &&
+      typeof parsed?.participantId === "string" &&
+      parsed.participantId
+    ) {
+      return parsed;
+    }
+  } catch {
+    /* ignore corrupt cache */
+  }
+  return null;
+}
+
+function writeHomeRoomCache(cache: HomeRoomCache) {
+  sessionStorage.setItem(HOME_ROOM_KEY, JSON.stringify(cache));
+}
+
+async function waitForHomeRoomCache(
+  timeoutMs = 5000,
+): Promise<HomeRoomCache | null> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const cached = readHomeRoomCache();
+    if (cached) return cached;
+    if (sessionStorage.getItem(HOME_CREATE_INFLIGHT_KEY) !== "1") {
+      return null;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return readHomeRoomCache();
+}
+
+async function createHomeRoomOnce(): Promise<HomeRoomCache> {
+  const cached = readHomeRoomCache();
+  if (cached) return cached;
+
+  if (sessionStorage.getItem(HOME_CREATE_INFLIGHT_KEY) === "1") {
+    const waited = await waitForHomeRoomCache();
+    if (waited) return waited;
+  }
+
+  sessionStorage.setItem(HOME_CREATE_INFLIGHT_KEY, "1");
+  try {
+    const again = readHomeRoomCache();
+    if (again) return again;
+
+    const response = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error ?? "ルーム作成に失敗しました");
+    }
+    const created: HomeRoomCache = {
+      code: data.room.code,
+      participantId: data.participantId,
+    };
+    writeHomeRoomCache(created);
+    return created;
+  } finally {
+    sessionStorage.removeItem(HOME_CREATE_INFLIGHT_KEY);
+  }
+}
+
 export default function HomePage() {
-  const [workMinutes, setWorkMinutes] = useState("25");
-  const [breakMinutes, setBreakMinutes] = useState("5");
-  const [createDisplayName, setCreateDisplayName] = useState("");
-  const [roomCode, setRoomCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  async function onCreate(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/rooms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workMinutes: Number(workMinutes),
-          breakMinutes: Number(breakMinutes),
-          displayName: createDisplayName,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? "ルーム作成に失敗しました");
+  useEffect(() => {
+    let cancelled = false;
+    const go = async () => {
+      try {
+        const created = await createHomeRoomOnce();
+        storeParticipant(created.code, created.participantId);
+        if (!cancelled) {
+          router.replace(`/room/${created.code}`);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "ルーム作成に失敗しました");
+        }
       }
-      storeParticipant(data.room.code, data.participantId);
-      window.location.assign(`/room/${data.room.code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "ルーム作成に失敗しました");
-      setBusy(false);
-    }
-  }
-
-  async function onJoin(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const code = roomCode.trim().toUpperCase();
-    try {
-      const response = await fetch(`/api/rooms/${encodeURIComponent(code)}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? "参加に失敗しました");
-      }
-      storeParticipant(data.room.code, data.participantId);
-      window.location.assign(`/room/${data.room.code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "参加に失敗しました");
-      setBusy(false);
-    }
-  }
+    };
+    void go();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   return (
     <div className={styles.page}>
       <main className={styles.main}>
         <h1 className={styles.brand}>pacer</h1>
-        <p className={styles.tagline}>共有の作業と休憩リズム</p>
-
-        <form className={styles.panel} onSubmit={onCreate}>
-          <h2>ルームを作成</h2>
-          <label className={styles.field}>
-            <span>表示名</span>
-            <input
-              type="text"
-              aria-label="表示名"
-              value={createDisplayName}
-              onChange={(e) => setCreateDisplayName(e.target.value)}
-              required
-            />
-          </label>
-          <label className={styles.field}>
-            <span>作業（分）</span>
-            <input
-              type="number"
-              min={1}
-              aria-label="作業（分）"
-              value={workMinutes}
-              onChange={(e) => setWorkMinutes(e.target.value)}
-              required
-            />
-          </label>
-          <label className={styles.field}>
-            <span>休憩（分）</span>
-            <input
-              type="number"
-              min={1}
-              aria-label="休憩（分）"
-              value={breakMinutes}
-              onChange={(e) => setBreakMinutes(e.target.value)}
-              required
-            />
-          </label>
-          <button type="submit" disabled={busy}>
-            ルームを作成
-          </button>
-        </form>
-
-        <form className={styles.panel} onSubmit={onJoin}>
-          <h2>ルームに参加</h2>
-          <label className={styles.field}>
-            <span>ルームコード</span>
-            <input
-              type="text"
-              aria-label="ルームコード"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
-              autoComplete="off"
-              required
-            />
-          </label>
-          <label className={styles.field}>
-            <span>表示名</span>
-            <input
-              type="text"
-              aria-label="表示名"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-            />
-          </label>
-          <button type="submit" disabled={busy}>
-            参加
-          </button>
-        </form>
-
-        {error ? <p className={styles.error}>{error}</p> : null}
+        <p className={styles.tagline}>
+          {error ?? "ルームを準備しています…"}
+        </p>
       </main>
     </div>
   );

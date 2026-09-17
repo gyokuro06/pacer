@@ -25,8 +25,10 @@ export type Room = {
   lastActivityAt: number;
 };
 
-export const MIN_PARTICIPANTS_TO_START = 2;
+export const MIN_PARTICIPANTS_TO_START = 1;
 export const MAX_PARTICIPANTS = 4;
+export const DEFAULT_WORK_MINUTES = 60;
+export const DEFAULT_BREAK_MINUTES = 10;
 export const SESSION_REJOIN_TTL_HOURS = 24;
 export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
 
@@ -126,12 +128,30 @@ function withAssignedEmoji(
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+export const AUTO_DISPLAY_NAMES = [
+  "ねこぱんつ",
+  "うどん侍",
+  "もちもち太郎",
+  "かりんとう姫",
+  "ささみ騎士",
+  "ぷりん将軍",
+  "やきとり船長",
+  "めんだこ博士",
+] as const;
+
 export function generateRoomCode(length = 6): string {
   let code = "";
   for (let i = 0; i < length; i += 1) {
     code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
   }
   return code;
+}
+
+export function generateAutoDisplayName(
+  random = Math.random,
+): string {
+  const index = Math.floor(random() * AUTO_DISPLAY_NAMES.length);
+  return AUTO_DISPLAY_NAMES[index] ?? AUTO_DISPLAY_NAMES[0];
 }
 
 export function formatRemainingMs(remainingMs: number): string {
@@ -163,6 +183,20 @@ export function canStart(room: Room): boolean {
     room.phase === "waiting" &&
     room.participants.length >= MIN_PARTICIPANTS_TO_START
   );
+}
+
+export function requireRoomMember(
+  room: Room,
+  participantId: string | undefined | null,
+): string {
+  const id = typeof participantId === "string" ? participantId.trim() : "";
+  if (!id) {
+    throw new Error("参加者IDは必須です");
+  }
+  if (!room.participants.some((p) => p.id === id)) {
+    throw new Error("参加者が見つかりません");
+  }
+  return id;
 }
 
 export function isRoomExpired(
@@ -239,6 +273,43 @@ export function startSessionState(room: Room, now = Date.now()): Room {
     pendingProposal: null,
     lastActivityAt: now,
   };
+}
+
+export function updateRoomMinutesState(
+  room: Room,
+  workMinutes: number,
+  breakMinutes: number,
+  now = Date.now(),
+): Room {
+  if (room.phase !== "waiting") {
+    throw new Error("待機中のみ分数を変更できます");
+  }
+  if (!Number.isFinite(workMinutes) || workMinutes <= 0) {
+    throw new Error("作業時間が不正です");
+  }
+  if (!Number.isFinite(breakMinutes) || breakMinutes <= 0) {
+    throw new Error("休憩時間が不正です");
+  }
+  return {
+    ...room,
+    workMinutes,
+    breakMinutes,
+    lastActivityAt: now,
+  };
+}
+
+export function updateDisplayNameState(
+  room: Room,
+  participantId: string,
+  displayName: string,
+  now = Date.now(),
+): Room {
+  return changeParticipantDisplayNameState(
+    room,
+    participantId,
+    displayName,
+    now,
+  );
 }
 
 export function proposeState(
