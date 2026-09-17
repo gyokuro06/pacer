@@ -72,12 +72,19 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
     }
 
-    fun assertParticipantVisibleWithEmoji(displayName: String) {
+    fun assertParticipantAvatarWithName(displayName: String) {
         PlaywrightAssertions.assertThat(participantItem(displayName)).isVisible()
+        PlaywrightAssertions.assertThat(participantAvatar(displayName)).isVisible()
+        PlaywrightAssertions.assertThat(participantDisplayName(displayName)).isVisible()
         val emoji = readParticipantEmoji(displayName)
         require(emoji.isNotEmpty()) {
             "表示名 \"$displayName\" の参加者に絵文字がありません"
         }
+    }
+
+    fun assertParticipantHasYou(displayName: String) {
+        PlaywrightAssertions.assertThat(participantYouLabel(displayName)).isVisible()
+        PlaywrightAssertions.assertThat(participantDisplayName(displayName)).isVisible()
     }
 
     fun assertParticipantEmojisDistinct(displayNameA: String, displayNameB: String) {
@@ -89,14 +96,10 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun readParticipantEmoji(displayName: String): String {
-        PlaywrightAssertions.assertThat(participantItem(displayName)).isVisible()
-        val text = participantItem(displayName).innerText().trim()
-        val emoji = text
-            .replace(displayName, "")
-            .replace("絵文字を変更", "")
-            .trim()
+        PlaywrightAssertions.assertThat(participantAvatar(displayName)).isVisible()
+        val emoji = participantAvatar(displayName).innerText().trim()
         require(emoji.isNotEmpty()) {
-            "表示名 \"$displayName\" の参加者に絵文字がありません: \"$text\""
+            "表示名 \"$displayName\" の参加者に絵文字がありません"
         }
         return emoji
     }
@@ -115,13 +118,37 @@ class RoomPage(page: Page) : BasePage(page) {
         }
     }
 
-    fun assertOwnEmojiPickerOffersOnlyOwnAndUnused(ownDisplayName: String) {
+    fun openOwnProfileViaAvatar(ownDisplayName: String) {
+        participantAvatar(ownDisplayName).click()
+        assertProfileDialogVisible()
+    }
+
+    fun openOwnProfileViaName(ownDisplayName: String) {
+        participantDisplayName(ownDisplayName).click()
+        assertProfileDialogVisible()
+    }
+
+    fun assertProfileDialogVisible() {
+        PlaywrightAssertions.assertThat(profileDialog()).isVisible()
+    }
+
+    fun assertOtherAvatarDoesNotOpenProfile(otherDisplayName: String) {
+        participantAvatar(otherDisplayName).click()
+        PlaywrightAssertions.assertThat(profileDialog()).isHidden()
+    }
+
+    fun assertOtherNameDoesNotOpenProfile(otherDisplayName: String) {
+        participantDisplayName(otherDisplayName).click()
+        PlaywrightAssertions.assertThat(profileDialog()).isHidden()
+    }
+
+    fun assertProfileEmojiOffersOnlyOwnAndUnused(ownDisplayName: String) {
         val others = participantEmojis()
             .filterKeys { it != ownDisplayName }
             .values
             .toSet()
         val own = readParticipantEmoji(ownDisplayName)
-        openOwnEmojiPicker(ownDisplayName)
+        assertProfileDialogVisible()
         val enabled = enabledEmojiOptions()
         require(own in enabled) {
             "自分の絵文字 \"$own\" が選べません: $enabled"
@@ -133,21 +160,20 @@ class RoomPage(page: Page) : BasePage(page) {
         require(enabled.any { it != own }) {
             "未使用の絵文字が選べません: $enabled"
         }
-        closeOwnEmojiPicker()
     }
 
-    fun changeOwnEmojiToUnused(ownDisplayName: String) {
+    fun changeOwnEmojiViaProfileToUnused(ownDisplayName: String) {
         val others = participantEmojis()
             .filterKeys { it != ownDisplayName }
             .values
             .toSet()
         val own = readParticipantEmoji(ownDisplayName)
-        openOwnEmojiPicker(ownDisplayName)
+        assertProfileDialogVisible()
         val next =
             enabledEmojiOptions().firstOrNull { it != own && it !in others }
                 ?: error("未使用の絵文字がありません: own=$own others=$others")
         emojiOption(next).click()
-        PlaywrightAssertions.assertThat(emojiPicker()).isHidden()
+        PlaywrightAssertions.assertThat(profileDialog()).isHidden()
         assertParticipantEmojiEquals(ownDisplayName, next)
     }
 
@@ -157,32 +183,20 @@ class RoomPage(page: Page) : BasePage(page) {
             .getByRole(AriaRole.LISTITEM)
             .all()
             .associate { item ->
-                val text = item.innerText().trim()
                 val displayName =
-                    text
-                        .replace("絵文字を変更", "")
-                        .trim()
-                        .split(Regex("\\s+"))
-                        .lastOrNull()
-                        ?: error("参加者の表示名が読めません: \"$text\"")
+                    item
+                        .getByRole(AriaRole.BUTTON)
+                        .all()
+                        .map { it.getAttribute("aria-label").orEmpty() }
+                        .firstOrNull { it.endsWith("のアバター") }
+                        ?.removeSuffix("のアバター")
+                        ?: error("参加者の表示名が読めません: \"${item.innerText().trim()}\"")
                 displayName to readParticipantEmoji(displayName)
             }
     }
 
-    private fun openOwnEmojiPicker(ownDisplayName: String) {
-        changeEmojiButton(ownDisplayName).click()
-        PlaywrightAssertions.assertThat(emojiPicker()).isVisible()
-    }
-
-    private fun closeOwnEmojiPicker() {
-        if (emojiPicker().isVisible) {
-            playwrightPage.keyboard().press("Escape")
-        }
-        PlaywrightAssertions.assertThat(emojiPicker()).isHidden()
-    }
-
     private fun enabledEmojiOptions(): List<String> =
-        emojiPicker()
+        profileDialog()
             .getByRole(AriaRole.BUTTON)
             .all()
             .filter { it.isEnabled }
@@ -190,14 +204,10 @@ class RoomPage(page: Page) : BasePage(page) {
             .filter { it.isNotEmpty() }
 
     private fun emojiOption(emoji: String): Locator =
-        emojiPicker().getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(emoji))
+        profileDialog().getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(emoji))
 
-    private fun changeEmojiButton(displayName: String): Locator =
-        participantItem(displayName)
-            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("絵文字を変更"))
-
-    private fun emojiPicker(): Locator =
-        playwrightPage.getByRole(AriaRole.DIALOG, Page.GetByRoleOptions().setName("絵文字を選ぶ"))
+    private fun profileDialog(): Locator =
+        playwrightPage.getByRole(AriaRole.DIALOG, Page.GetByRoleOptions().setName("プロフィール"))
 
     private fun participants(): Locator =
         main.getByRole(AriaRole.LIST, Locator.GetByRoleOptions().setName("参加者"))
@@ -205,7 +215,28 @@ class RoomPage(page: Page) : BasePage(page) {
     private fun participantItem(displayName: String): Locator =
         participants()
             .getByRole(AriaRole.LISTITEM)
-            .filter(Locator.FilterOptions().setHasText(displayName))
+            .filter(
+                Locator.FilterOptions().setHas(
+                    playwrightPage.getByRole(
+                        AriaRole.BUTTON,
+                        Page.GetByRoleOptions().setName("${displayName}のアバター"),
+                    ),
+                ),
+            )
+
+    private fun participantAvatar(displayName: String): Locator =
+        participantItem(displayName)
+            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("${displayName}のアバター"))
+
+    private fun participantDisplayName(displayName: String): Locator =
+        participantItem(displayName)
+            .getByRole(
+                AriaRole.BUTTON,
+                Locator.GetByRoleOptions().setName(displayName).setExact(true),
+            )
+
+    private fun participantYouLabel(displayName: String): Locator =
+        participantItem(displayName).getByText("You", Locator.GetByTextOptions().setExact(true))
 
     private fun roomCode(): Locator =
         main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
