@@ -541,19 +541,10 @@ export default function RoomPage() {
               disabled={!canStart(room)}
               onClick={() => {
                 unlockAudio();
-                void (async () => {
-                  void requestNotificationPermission();
-                  setDraftWork(null);
-                  setDraftBreak(null);
-                  const saved = await patchRoom({
-                    workMinutes: Number(workValue),
-                    breakMinutes: Number(breakValue),
-                  });
-                  if (!saved) return;
-                  await postAction(
-                    `/api/rooms/${encodeURIComponent(code)}/start`,
-                  );
-                })();
+                void requestNotificationPermission();
+                void postAction(
+                  `/api/rooms/${encodeURIComponent(code)}/start`,
+                );
               }}
             >
               スタート

@@ -214,7 +214,8 @@ class RoomPage(page: Page) : BasePage(page) {
 
     fun advanceTimerPastEnd() {
         ParticipantSessions.ensureClockInstalled(playwrightPage)
-        playwrightPage.clock().fastForward(61_000)
+        val remainingMs = (parseMmSsToSeconds(readRemainingTime()) * 1000).toLong() + 1_000
+        playwrightPage.clock().fastForward(remainingMs.coerceAtLeast(1_000))
     }
 
     fun advanceTimerBySeconds(seconds: Long) {
