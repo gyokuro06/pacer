@@ -10,6 +10,7 @@ object ParticipantSessions {
     private var sharedRoomCode: String? = null
     private var rememberedRemainingMmSs: String? = null
     private var rememberedRemainingAtMs: Long? = null
+    private val rememberedEmojis = mutableMapOf<String, String>()
 
     fun openHome(participant: String, browser: Browser): Page {
         close(participant)
@@ -47,6 +48,14 @@ object ParticipantSessions {
         rememberedRemainingAtMs
             ?: error("残り時間がまだ記憶されていません")
 
+    fun rememberEmoji(displayName: String, emoji: String) {
+        rememberedEmojis[displayName] = emoji.trim()
+    }
+
+    fun rememberedEmoji(displayName: String): String =
+        rememberedEmojis[displayName]?.takeIf { it.isNotEmpty() }
+            ?: error("表示名 \"$displayName\" の絵文字がまだ記憶されていません")
+
     fun clear() {
         contexts.values.forEach { context ->
             runCatching { context.close() }
@@ -56,6 +65,7 @@ object ParticipantSessions {
         sharedRoomCode = null
         rememberedRemainingMmSs = null
         rememberedRemainingAtMs = null
+        rememberedEmojis.clear()
     }
 
     private fun close(participant: String) {
