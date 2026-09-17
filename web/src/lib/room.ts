@@ -30,7 +30,16 @@ export const MAX_PARTICIPANTS = 4;
 export const SESSION_REJOIN_TTL_HOURS = 24;
 export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
 
-export const PARTICIPANT_EMOJIS = ["🦊", "🐸", "🦉", "🐙"] as const;
+export const PARTICIPANT_EMOJIS = [
+  "🦊",
+  "🐸",
+  "🦉",
+  "🐙",
+  "🐱",
+  "🐼",
+  "🦄",
+  "🐧",
+] as const;
 
 export function pickUnusedEmoji(usedEmojis: readonly string[]): string {
   const used = new Set(usedEmojis);

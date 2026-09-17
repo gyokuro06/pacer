@@ -29,7 +29,7 @@ export default function RoomPage() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [selfId, setSelfId] = useState<string | null>(null);
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
@@ -69,13 +69,13 @@ export default function RoomPage() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!emojiPickerOpen) return;
+    if (!profileOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setEmojiPickerOpen(false);
+      if (event.key === "Escape") setProfileOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [emojiPickerOpen]);
+  }, [profileOpen]);
 
   async function postAction(path: string, body?: unknown) {
     setError(null);
@@ -99,7 +99,7 @@ export default function RoomPage() {
       participantId: selfId,
       emoji,
     });
-    if (ok) setEmojiPickerOpen(false);
+    if (ok) setProfileOpen(false);
   }
 
   if (!room) {
@@ -192,30 +192,42 @@ export default function RoomPage() {
         </div>
 
         <ul aria-label="参加者" className={styles.participants}>
-          {room.participants.map((participant) => (
-            <li key={participant.id} className={styles.participant}>
-              <span>
-                {participant.emoji} {participant.displayName}
-              </span>
-              {participant.id === selfId ? (
+          {room.participants.map((participant) => {
+            const isSelf = participant.id === selfId;
+            const openProfile = () => {
+              if (isSelf) setProfileOpen(true);
+            };
+            return (
+              <li key={participant.id} className={styles.participant}>
                 <button
                   type="button"
-                  className={styles.changeEmoji}
-                  onClick={() => setEmojiPickerOpen(true)}
+                  className={styles.avatar}
+                  aria-label={`${participant.displayName}のアバター`}
+                  onClick={openProfile}
                 >
-                  絵文字を変更
+                  {participant.emoji}
                 </button>
-              ) : null}
-            </li>
-          ))}
+                <button
+                  type="button"
+                  className={styles.displayName}
+                  onClick={openProfile}
+                >
+                  {participant.displayName}
+                </button>
+                {isSelf ? (
+                  <span className={styles.youLabel}>You</span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
 
-        {emojiPickerOpen ? (
+        {profileOpen ? (
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="絵文字を選ぶ"
-            className={styles.emojiDialog}
+            aria-label="プロフィール"
+            className={styles.profileDialog}
           >
             <div className={styles.emojiOptions}>
               {PARTICIPANT_EMOJIS.map((emoji) => (
