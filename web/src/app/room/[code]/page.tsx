@@ -11,15 +11,19 @@ import {
 import { useParams } from "next/navigation";
 import {
   canStart,
+  crossedToTimerEnd,
   formatRemainingMs,
   PARTICIPANT_EMOJIS,
   phaseLabel,
   remainingMs,
+  timerEndNotificationTitle,
   type Room,
 } from "@/lib/room";
 import styles from "./page.module.css";
 
 const POLL_MS = 500;
+
+type NotificationPermissionState = NotificationPermission | "unsupported";
 
 function participantStorageKey(code: string) {
   return `pacer:${code}:participantId`;
@@ -53,8 +57,12 @@ export default function RoomPage() {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState("");
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>("default");
   const profileOpenRef = useRef(false);
   profileOpenRef.current = profileOpen;
+  const previousRemainingRef = useRef<number | null>(null);
+  const notifiedPhaseKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -214,6 +222,50 @@ export default function RoomPage() {
     return room.participants.find((p) => p.id === participantId) ?? null;
   }, [room, participantId]);
 
+  const readNotificationPermission = useCallback((): NotificationPermissionState => {
+    if (typeof Notification === "undefined") return "unsupported";
+    return Notification.permission;
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setNotificationPermission(result);
+  }, []);
+
+  useEffect(() => {
+    setNotificationPermission(readNotificationPermission());
+  }, [readNotificationPermission]);
+
+  useEffect(() => {
+    if (!isParticipant) return;
+    void requestNotificationPermission();
+  }, [isParticipant, requestNotificationPermission]);
+
+  useEffect(() => {
+    if (!room || room.phase === "waiting") {
+      previousRemainingRef.current = null;
+      return;
+    }
+    const remaining = remainingMs(room, now);
+    const previous = previousRemainingRef.current;
+    previousRemainingRef.current = remaining;
+
+    if (!crossedToTimerEnd(previous, remaining)) return;
+    if (notificationPermission !== "granted") return;
+
+    const title = timerEndNotificationTitle(room.phase);
+    if (!title) return;
+
+    const phaseKey = `${room.phase}:${room.phaseEndsAt}`;
+    if (notifiedPhaseKeyRef.current === phaseKey) return;
+    notifiedPhaseKeyRef.current = phaseKey;
+    new Notification(title);
+  }, [room, now, notificationPermission]);
+
   const minutesEditable = room?.phase === "waiting" && isParticipant;
   const workValue = draftWork ?? (room ? String(room.workMinutes) : "");
   const breakValue = draftBreak ?? (room ? String(room.breakMinutes) : "");
@@ -372,6 +424,17 @@ export default function RoomPage() {
               }
             >
               スタート
+            </button>
+          ) : null}
+
+          {isParticipant &&
+          notificationPermission !== "granted" &&
+          notificationPermission !== "unsupported" ? (
+            <button
+              type="button"
+              onClick={() => void requestNotificationPermission()}
+            >
+              通知をオン
             </button>
           ) : null}
 

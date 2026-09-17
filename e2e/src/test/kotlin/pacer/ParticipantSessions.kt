@@ -25,6 +25,7 @@ object ParticipantSessions {
           window.__pacerPermissionRequests = 0;
           const NativeNotification = window.Notification;
           if (!NativeNotification) return;
+          let permissionOverride = null;
           function SpyNotification(title, options) {
             const body = options && options.body != null ? String(options.body) : null;
             window.__pacerNotifications.push({ title: String(title), body });
@@ -36,11 +37,17 @@ object ParticipantSessions {
           }
           SpyNotification.prototype = NativeNotification.prototype;
           Object.defineProperty(SpyNotification, 'permission', {
-            get() { return NativeNotification.permission; },
+            get() {
+              return permissionOverride != null
+                ? permissionOverride
+                : NativeNotification.permission;
+            },
           });
           SpyNotification.requestPermission = async function (...args) {
             window.__pacerPermissionRequests += 1;
-            return NativeNotification.requestPermission(...args);
+            const result = await NativeNotification.requestPermission(...args);
+            permissionOverride = result;
+            return result;
           };
           window.Notification = SpyNotification;
         })();
