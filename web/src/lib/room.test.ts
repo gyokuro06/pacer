@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  changeParticipantDisplayNameState,
   changeParticipantEmojiState,
   confirmProposalState,
   createRoomState,
@@ -101,6 +102,69 @@ describe("changeParticipantEmojiState", () => {
     assert.throws(
       () => changeParticipantEmojiState(room, "a", "🍕"),
       /選べません/,
+    );
+  });
+});
+
+describe("changeParticipantDisplayNameState", () => {
+  it("renames self to an unused display name", () => {
+    const room = joinRoomState(
+      createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF"),
+      { id: "b", displayName: "Bob" },
+    ).room;
+    const updated = changeParticipantDisplayNameState(room, "a", "Alicia");
+    assert.equal(updated.participants[0]?.displayName, "Alicia");
+    assert.equal(updated.participants[0]?.emoji, PARTICIPANT_EMOJIS[0]);
+    assert.equal(updated.participants[1]?.displayName, "Bob");
+  });
+
+  it("allows keeping the current display name", () => {
+    const room = createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF");
+    const updated = changeParticipantDisplayNameState(room, "a", "Alice");
+    assert.equal(updated.participants[0]?.displayName, "Alice");
+  });
+
+  it("rejects a display name taken by another participant", () => {
+    const room = joinRoomState(
+      createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF"),
+      { id: "b", displayName: "Bob" },
+    ).room;
+    assert.throws(
+      () => changeParticipantDisplayNameState(room, "a", "Bob"),
+      /表示名は他の参加者が使用中/,
+    );
+  });
+
+  it("rejects blank display names", () => {
+    const room = createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF");
+    assert.throws(
+      () => changeParticipantDisplayNameState(room, "a", "   "),
+      /表示名は必須/,
+    );
+  });
+
+  it("rejoins by the new display name and not the old one", () => {
+    const room = joinRoomState(
+      createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF"),
+      { id: "b", displayName: "Bob" },
+    ).room;
+    const renamed = changeParticipantDisplayNameState(room, "b", "Bobby");
+    const asBobby = joinRoomState(renamed, {
+      id: "new-bobby",
+      displayName: "Bobby",
+    });
+    assert.equal(asBobby.participantId, "b");
+    assert.equal(asBobby.room.participants.length, 2);
+
+    const asOldBob = joinRoomState(renamed, {
+      id: "new-bob",
+      displayName: "Bob",
+    });
+    assert.equal(asOldBob.participantId, "new-bob");
+    assert.equal(asOldBob.room.participants.length, 3);
+    assert.equal(
+      asOldBob.room.participants.find((p) => p.id === "b")?.displayName,
+      "Bobby",
     );
   });
 });

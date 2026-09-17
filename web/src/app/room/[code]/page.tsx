@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   canStart,
@@ -30,6 +30,9 @@ export default function RoomPage() {
   const [now, setNow] = useState(() => Date.now());
   const [selfId, setSelfId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileDisplayName, setProfileDisplayName] = useState("");
+  const profileOpenRef = useRef(false);
+  profileOpenRef.current = profileOpen;
 
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
@@ -51,7 +54,7 @@ export default function RoomPage() {
     const tick = async () => {
       try {
         await refresh();
-        if (!cancelled) setError(null);
+        if (!cancelled && !profileOpenRef.current) setError(null);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "同期に失敗しました");
@@ -93,12 +96,30 @@ export default function RoomPage() {
     return true;
   }
 
+  function openProfile(displayName: string) {
+    setProfileDisplayName(displayName);
+    setError(null);
+    setProfileOpen(true);
+  }
+
   async function selectEmoji(emoji: string) {
     if (!selfId) return;
     const ok = await postAction(`/api/rooms/${encodeURIComponent(code)}/emoji`, {
       participantId: selfId,
       emoji,
     });
+    if (ok) setProfileOpen(false);
+  }
+
+  async function saveDisplayName() {
+    if (!selfId) return;
+    const ok = await postAction(
+      `/api/rooms/${encodeURIComponent(code)}/display-name`,
+      {
+        participantId: selfId,
+        displayName: profileDisplayName,
+      },
+    );
     if (ok) setProfileOpen(false);
   }
 
@@ -201,7 +222,7 @@ export default function RoomPage() {
                     type="button"
                     className={styles.avatar}
                     aria-label={`${participant.displayName}のアバター`}
-                    onClick={() => setProfileOpen(true)}
+                    onClick={() => openProfile(participant.displayName)}
                   >
                     {participant.emoji}
                   </button>
@@ -217,7 +238,7 @@ export default function RoomPage() {
                   <button
                     type="button"
                     className={styles.displayName}
-                    onClick={() => setProfileOpen(true)}
+                    onClick={() => openProfile(participant.displayName)}
                   >
                     {participant.displayName}
                   </button>
@@ -242,6 +263,15 @@ export default function RoomPage() {
               aria-label="プロフィール"
               className={styles.profileDialog}
             >
+              <label className={styles.profileField}>
+                <span>表示名</span>
+                <input
+                  type="text"
+                  aria-label="表示名"
+                  value={profileDisplayName}
+                  onChange={(e) => setProfileDisplayName(e.target.value)}
+                />
+              </label>
               <div className={styles.emojiOptions}>
                 {PARTICIPANT_EMOJIS.map((emoji) => (
                   <button
@@ -254,11 +284,22 @@ export default function RoomPage() {
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                className={styles.profileSave}
+                onClick={() => void saveDisplayName()}
+              >
+                保存
+              </button>
             </div>
           </div>
         ) : null}
 
-        {error ? <p className={styles.error}>{error}</p> : null}
+        {error ? (
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+        ) : null}
       </main>
     </div>
   );

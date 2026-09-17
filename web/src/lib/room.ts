@@ -84,6 +84,35 @@ export function changeParticipantEmojiState(
   };
 }
 
+export function changeParticipantDisplayNameState(
+  room: Room,
+  participantId: string,
+  displayName: string,
+  now = Date.now(),
+): Room {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    throw new Error("表示名は必須です");
+  }
+  const self = room.participants.find((p) => p.id === participantId);
+  if (!self) {
+    throw new Error("参加者が見つかりません");
+  }
+  const takenByOther = room.participants.some(
+    (p) => p.id !== participantId && p.displayName === trimmed,
+  );
+  if (takenByOther) {
+    throw new Error("その表示名は他の参加者が使用中です");
+  }
+  return {
+    ...room,
+    participants: room.participants.map((p) =>
+      p.id === participantId ? { ...p, displayName: trimmed } : p,
+    ),
+    lastActivityAt: now,
+  };
+}
+
 function withAssignedEmoji(
   participant: ParticipantInput,
   usedEmojis: readonly string[],

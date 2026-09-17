@@ -233,7 +233,7 @@ class RoomPage(page: Page) : BasePage(page) {
             .all()
             .filter { it.isEnabled }
             .map { it.innerText().trim() }
-            .filter { it.isNotEmpty() }
+            .filter { it.isNotEmpty() && it != "保存" }
 
     private fun emojiOption(emoji: String): Locator =
         profileDialog().getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(emoji))
