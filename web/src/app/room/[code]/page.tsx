@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  FocusEvent,
   FormEvent,
   useCallback,
   useEffect,
@@ -12,18 +11,68 @@ import {
 import { useParams } from "next/navigation";
 import {
   canStart,
+  crossedToTimerEnd,
   formatRemainingMs,
   PARTICIPANT_EMOJIS,
   phaseLabel,
   remainingMs,
+  timerEndNotificationTitle,
   type Room,
 } from "@/lib/room";
 import styles from "./page.module.css";
 
 const POLL_MS = 500;
+const MINUTE_PRESETS = [60, 30, 15, 10] as const;
+
+function isMinutePreset(value: number): boolean {
+  return (MINUTE_PRESETS as readonly number[]).includes(value);
+}
+
+const TIMER_END_CHIME_URL = "/timer-end-chime.wav";
+
+type NotificationPermissionState = NotificationPermission | "unsupported";
+
+let timerEndChime: HTMLAudioElement | null = null;
 
 function participantStorageKey(code: string) {
   return `pacer:${code}:participantId`;
+}
+
+function getTimerEndChime(): HTMLAudioElement {
+  if (!timerEndChime) {
+    timerEndChime = new Audio(TIMER_END_CHIME_URL);
+    timerEndChime.preload = "auto";
+  }
+  return timerEndChime;
+}
+
+function unlockAudio() {
+  try {
+    const audio = getTimerEndChime();
+    audio.load();
+    audio.muted = true;
+    audio.volume = 0;
+    const primed = audio.play();
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
+    audio.volume = 1;
+    void primed.catch(() => undefined);
+  } catch {
+    /* best-effort unlock via existing clicks */
+  }
+}
+
+function playTimerEndChime() {
+  try {
+    const audio = getTimerEndChime();
+    audio.muted = false;
+    audio.volume = 1;
+    audio.currentTime = 0;
+    void audio.play().catch(() => undefined);
+  } catch {
+    /* autoplay / decode may fail; notification path is independent */
+  }
 }
 
 function readParticipantId(code: string): string | null {
@@ -49,13 +98,17 @@ export default function RoomPage() {
   const [joinName, setJoinName] = useState("");
   const [shareUrl, setShareUrl] = useState("");
   const [copyDone, setCopyDone] = useState(false);
-  const [draftWork, setDraftWork] = useState<string | null>(null);
-  const [draftBreak, setDraftBreak] = useState<string | null>(null);
   const [draftName, setDraftName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState("");
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>("default");
   const profileOpenRef = useRef(false);
   profileOpenRef.current = profileOpen;
+  const previousRemainingRef = useRef<number | null>(null);
+  const notifiedPhaseKeyRef = useRef<string | null>(null);
+  const pendingEndPhaseKeyRef = useRef<string | null>(null);
+  const chimedPhaseKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -65,13 +118,6 @@ export default function RoomPage() {
     setShareUrl(window.location.href);
   }, [code]);
 
-  const applyRoom = useCallback((next: Room) => {
-    setRoom((prev) => {
-      if (prev && next.lastActivityAt < prev.lastActivityAt) return prev;
-      return next;
-    });
-  }, []);
-
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
       cache: "no-store",
@@ -80,8 +126,8 @@ export default function RoomPage() {
     if (!response.ok) {
       throw new Error(data.error ?? "ルーム取得に失敗しました");
     }
-    applyRoom(data.room);
-  }, [applyRoom, code]);
+    setRoom(data.room);
+  }, [code]);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,7 +179,7 @@ export default function RoomPage() {
       setError(data.error ?? "操作に失敗しました");
       return false;
     }
-    applyRoom(data.room);
+    setRoom(data.room);
     return true;
   }
 
@@ -178,44 +224,13 @@ export default function RoomPage() {
       setError(data.error ?? "更新に失敗しました");
       return false;
     }
-    applyRoom(data.room);
+    setRoom(data.room);
     return true;
-  }
-
-  function isMinutesInput(target: EventTarget | null): boolean {
-    return (
-      target instanceof HTMLInputElement &&
-      (target.getAttribute("aria-label") === "作業（分）" ||
-        target.getAttribute("aria-label") === "休憩（分）")
-    );
-  }
-
-  function commitMinutesFromBlur(
-    event: FocusEvent<HTMLInputElement>,
-  ) {
-    if (!minutesEditable || !room) return;
-    if (isMinutesInput(event.relatedTarget)) return;
-    const container = event.currentTarget.closest(`.${styles.minutes}`);
-    if (!container) return;
-    const workInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="作業（分）"]',
-    );
-    const breakInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="休憩（分）"]',
-    );
-    if (!workInput || !breakInput) return;
-    const workMinutes = Number(workInput.value);
-    const breakMinutes = Number(breakInput.value);
-    void patchRoom({ workMinutes, breakMinutes }).then((ok) => {
-      if (ok) {
-        setDraftWork(null);
-        setDraftBreak(null);
-      }
-    });
   }
 
   async function onJoin(event: FormEvent) {
     event.preventDefault();
+    unlockAudio();
     setError(null);
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}/join`, {
       method: "POST",
@@ -255,9 +270,83 @@ export default function RoomPage() {
     return room.participants.find((p) => p.id === participantId) ?? null;
   }, [room, participantId]);
 
+  const readNotificationPermission = useCallback((): NotificationPermissionState => {
+    if (typeof Notification === "undefined") return "unsupported";
+    return Notification.permission;
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setNotificationPermission(result);
+  }, []);
+
+  useEffect(() => {
+    setNotificationPermission(readNotificationPermission());
+  }, [readNotificationPermission]);
+
+  useEffect(() => {
+    if (!isParticipant) return;
+    void requestNotificationPermission();
+  }, [isParticipant, requestNotificationPermission]);
+
+  useEffect(() => {
+    if (!room || room.phase === "waiting") {
+      previousRemainingRef.current = null;
+      pendingEndPhaseKeyRef.current = null;
+      return;
+    }
+
+    const phaseKey = `${room.phase}:${room.phaseEndsAt}`;
+    const remaining = remainingMs(room, now);
+    const previous = previousRemainingRef.current;
+    previousRemainingRef.current = remaining;
+
+    if (crossedToTimerEnd(previous, remaining)) {
+      const title = timerEndNotificationTitle(room.phase);
+      if (title) {
+        pendingEndPhaseKeyRef.current = phaseKey;
+        if (chimedPhaseKeyRef.current !== phaseKey) {
+          chimedPhaseKeyRef.current = phaseKey;
+          playTimerEndChime();
+        }
+      }
+    } else if (
+      pendingEndPhaseKeyRef.current &&
+      pendingEndPhaseKeyRef.current !== phaseKey
+    ) {
+      pendingEndPhaseKeyRef.current = null;
+    }
+
+    const pendingKey = pendingEndPhaseKeyRef.current;
+    if (!pendingKey || pendingKey !== phaseKey) return;
+    if (notifiedPhaseKeyRef.current === pendingKey) {
+      pendingEndPhaseKeyRef.current = null;
+      return;
+    }
+
+    const livePermission =
+      typeof Notification === "undefined"
+        ? "unsupported"
+        : Notification.permission;
+    if (livePermission !== "granted") return;
+
+    const title = timerEndNotificationTitle(room.phase);
+    if (!title) return;
+
+    notifiedPhaseKeyRef.current = pendingKey;
+    pendingEndPhaseKeyRef.current = null;
+    try {
+      new Notification(title);
+    } catch {
+      /* browser may reject; permission UI still covers recovery */
+    }
+  }, [room, now, notificationPermission]);
+
   const minutesEditable = isParticipant;
-  const workValue = draftWork ?? (room ? String(room.workMinutes) : "");
-  const breakValue = draftBreak ?? (room ? String(room.breakMinutes) : "");
   const nameValue = draftName ?? self?.displayName ?? "";
 
   if (!room) {
@@ -272,6 +361,8 @@ export default function RoomPage() {
 
   const remaining = remainingMs(room, now);
   const showTimer = room.phase !== "waiting" && remaining != null;
+  const timerEndedTitle =
+    showTimer && remaining <= 0 ? timerEndNotificationTitle(room.phase) : null;
   const takenByOthers = new Set(
     room.participants
       .filter((p) => p.id !== participantId)
@@ -355,6 +446,12 @@ export default function RoomPage() {
           </div>
         ) : null}
 
+        {timerEndedTitle ? (
+          <p role="status" aria-live="assertive" className={styles.timerEndNotice}>
+            {timerEndedTitle}
+          </p>
+        ) : null}
+
         <div className={styles.timerRow}>
           {showTimer ? (
             <div role="timer" aria-label="残り時間" className={styles.timer}>
@@ -364,30 +461,76 @@ export default function RoomPage() {
             <div className={styles.timerPlaceholder} aria-hidden="true" />
           )}
           <div className={styles.minutes}>
-            <label className={styles.field}>
+            <div className={styles.field}>
               <span>作業（分）</span>
-              <input
-                type="number"
-                min={1}
+              {!isMinutePreset(room.workMinutes) ? (
+                <div
+                  role="status"
+                  aria-label="作業の現在（分）"
+                  className={styles.currentMinutes}
+                >
+                  {room.workMinutes}
+                </div>
+              ) : null}
+              <div
+                role="radiogroup"
                 aria-label="作業（分）"
-                value={workValue}
-                disabled={!minutesEditable}
-                onChange={(e) => setDraftWork(e.target.value)}
-                onBlur={commitMinutesFromBlur}
-              />
-            </label>
-            <label className={styles.field}>
+                className={styles.presetGroup}
+              >
+                {MINUTE_PRESETS.map((minutes) => (
+                  <button
+                    key={`work-${minutes}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={room.workMinutes === minutes}
+                    aria-label={String(minutes)}
+                    className={styles.presetOption}
+                    disabled={!minutesEditable}
+                    onClick={() => {
+                      if (!minutesEditable) return;
+                      void patchRoom({ workMinutes: minutes });
+                    }}
+                  >
+                    {minutes}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.field}>
               <span>休憩（分）</span>
-              <input
-                type="number"
-                min={1}
+              {!isMinutePreset(room.breakMinutes) ? (
+                <div
+                  role="status"
+                  aria-label="休憩の現在（分）"
+                  className={styles.currentMinutes}
+                >
+                  {room.breakMinutes}
+                </div>
+              ) : null}
+              <div
+                role="radiogroup"
                 aria-label="休憩（分）"
-                value={breakValue}
-                disabled={!minutesEditable}
-                onChange={(e) => setDraftBreak(e.target.value)}
-                onBlur={commitMinutesFromBlur}
-              />
-            </label>
+                className={styles.presetGroup}
+              >
+                {MINUTE_PRESETS.map((minutes) => (
+                  <button
+                    key={`break-${minutes}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={room.breakMinutes === minutes}
+                    aria-label={String(minutes)}
+                    className={styles.presetOption}
+                    disabled={!minutesEditable}
+                    onClick={() => {
+                      if (!minutesEditable) return;
+                      void patchRoom({ breakMinutes: minutes });
+                    }}
+                  >
+                    {minutes}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -396,11 +539,29 @@ export default function RoomPage() {
             <button
               type="button"
               disabled={!canStart(room)}
-              onClick={() =>
-                void postAction(`/api/rooms/${encodeURIComponent(code)}/start`)
-              }
+              onClick={() => {
+                unlockAudio();
+                void requestNotificationPermission();
+                void postAction(
+                  `/api/rooms/${encodeURIComponent(code)}/start`,
+                );
+              }}
             >
               スタート
+            </button>
+          ) : null}
+
+          {isParticipant &&
+          notificationPermission !== "granted" &&
+          notificationPermission !== "unsupported" ? (
+            <button
+              type="button"
+              onClick={() => {
+                unlockAudio();
+                void requestNotificationPermission();
+              }}
+            >
+              通知をオン
             </button>
           ) : null}
 

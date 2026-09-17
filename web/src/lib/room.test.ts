@@ -18,6 +18,8 @@ import {
   SESSION_REJOIN_TTL_MS,
   startSessionState,
   updateRoomMinutesState,
+  timerEndNotificationTitle,
+  crossedToTimerEnd,
 } from "./room";
 
 describe("formatRemainingMs", () => {
@@ -31,6 +33,29 @@ describe("formatRemainingMs", () => {
 
   it("ceils partial seconds", () => {
     assert.equal(formatRemainingMs(1500), "00:02");
+  });
+});
+
+describe("timerEndNotificationTitle", () => {
+  it("returns phase-specific end titles", () => {
+    assert.equal(timerEndNotificationTitle("work"), "作業終了");
+    assert.equal(timerEndNotificationTitle("break"), "休憩終了");
+    assert.equal(timerEndNotificationTitle("waiting"), null);
+  });
+});
+
+describe("crossedToTimerEnd", () => {
+  it("detects positive to zero-or-below edge", () => {
+    assert.equal(crossedToTimerEnd(1, 0), true);
+    assert.equal(crossedToTimerEnd(500, -10), true);
+  });
+
+  it("rejects nulls, already-ended, and still-positive", () => {
+    assert.equal(crossedToTimerEnd(null, 0), false);
+    assert.equal(crossedToTimerEnd(1, null), false);
+    assert.equal(crossedToTimerEnd(0, -1), false);
+    assert.equal(crossedToTimerEnd(-5, -10), false);
+    assert.equal(crossedToTimerEnd(2000, 1000), false);
   });
 });
 

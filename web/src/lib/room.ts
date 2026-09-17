@@ -178,6 +178,25 @@ export function phaseLabel(phase: Phase): string {
   }
 }
 
+export function timerEndNotificationTitle(phase: Phase): string | null {
+  switch (phase) {
+    case "work":
+      return "作業終了";
+    case "break":
+      return "休憩終了";
+    default:
+      return null;
+  }
+}
+
+export function crossedToTimerEnd(
+  previousRemainingMs: number | null,
+  nextRemainingMs: number | null,
+): boolean {
+  if (previousRemainingMs == null || nextRemainingMs == null) return false;
+  return previousRemainingMs > 0 && nextRemainingMs <= 0;
+}
+
 export function canStart(room: Room): boolean {
   return (
     room.phase === "waiting" &&
