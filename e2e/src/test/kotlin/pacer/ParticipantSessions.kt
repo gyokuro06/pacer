@@ -53,6 +53,21 @@ object ParticipantSessions {
         })();
         """.trimIndent()
 
+    private val chimeSpyScript =
+        """
+        (() => {
+          window.__pacerChimePlays = [];
+          const nativePlay = HTMLAudioElement.prototype.play;
+          HTMLAudioElement.prototype.play = function (...args) {
+            window.__pacerChimePlays.push({
+              src: String(this.src || ''),
+              at: Date.now(),
+            });
+            return nativePlay.apply(this, args).catch(() => undefined);
+          };
+        })();
+        """.trimIndent()
+
     fun openHome(
         participant: String,
         browser: Browser,
@@ -61,6 +76,7 @@ object ParticipantSessions {
         close(participant)
         val context = browser.newContext()
         context.addInitScript(notificationSpyScript)
+        context.addInitScript(chimeSpyScript)
         if (notificationPermission == NotificationPermissionMode.GRANTED) {
             context.grantPermissions(listOf("notifications"))
         }
@@ -78,6 +94,7 @@ object ParticipantSessions {
         close(participant)
         val context = browser.newContext()
         context.addInitScript(notificationSpyScript)
+        context.addInitScript(chimeSpyScript)
         val page = context.newPage()
         contexts[participant] = context
         pages[participant] = page

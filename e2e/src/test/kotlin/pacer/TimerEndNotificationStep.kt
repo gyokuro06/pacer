@@ -42,6 +42,11 @@ class TimerEndNotificationStep {
         RoomPage(ParticipantSessions.page(name)).assertBrowserNotificationCount(title, 1)
     }
 
+    @Step("参加者 <name> に終了チャイムが1回鳴っている")
+    fun 参加者に終了チャイムが1回鳴っている(name: String) {
+        RoomPage(ParticipantSessions.page(name)).assertEndChimePlayCount(1)
+    }
+
     @Step("参加者 <name> に通知の許可が求められている")
     fun 参加者に通知の許可が求められている(name: String) {
         RoomPage(ParticipantSessions.page(name)).assertNotificationPermissionRequested()

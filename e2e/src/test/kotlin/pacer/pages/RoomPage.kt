@@ -181,6 +181,20 @@ class RoomPage(page: Page) : BasePage(page) {
         }
     }
 
+    fun assertEndChimePlayCount(expectedCount: Int) {
+        playwrightPage.waitForFunction(
+            """expectedCount => (window.__pacerChimePlays || []).length === expectedCount""",
+            expectedCount,
+            Page.WaitForFunctionOptions().setTimeout(10_000.0),
+        )
+        @Suppress("UNCHECKED_CAST")
+        val plays =
+            playwrightPage.evaluate("() => window.__pacerChimePlays || []") as List<*>
+        require(plays.size == expectedCount) {
+            "終了チャイムの再生回数が一致しません: actual=${plays.size} expected=$expectedCount plays=$plays"
+        }
+    }
+
     fun assertNotificationPermissionRequested() {
         playwrightPage.waitForFunction(
             "() => (window.__pacerPermissionRequests || 0) >= 1",
