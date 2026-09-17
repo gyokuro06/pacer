@@ -63,6 +63,7 @@ export default function RoomPage() {
   profileOpenRef.current = profileOpen;
   const previousRemainingRef = useRef<number | null>(null);
   const notifiedPhaseKeyRef = useRef<string | null>(null);
+  const pendingEndPhaseKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -165,8 +166,8 @@ export default function RoomPage() {
     }
   }
 
-  async function patchRoom(body: Record<string, unknown>) {
-    if (!participantId) return;
+  async function patchRoom(body: Record<string, unknown>): Promise<boolean> {
+    if (!participantId) return false;
     setError(null);
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
       method: "PATCH",
@@ -176,9 +177,10 @@ export default function RoomPage() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "更新に失敗しました");
-      return;
+      return false;
     }
     setRoom(data.room);
+    return true;
   }
 
   async function onJoin(event: FormEvent) {
@@ -248,22 +250,48 @@ export default function RoomPage() {
   useEffect(() => {
     if (!room || room.phase === "waiting") {
       previousRemainingRef.current = null;
+      pendingEndPhaseKeyRef.current = null;
       return;
     }
+
+    const phaseKey = `${room.phase}:${room.phaseEndsAt}`;
     const remaining = remainingMs(room, now);
     const previous = previousRemainingRef.current;
     previousRemainingRef.current = remaining;
 
-    if (!crossedToTimerEnd(previous, remaining)) return;
-    if (notificationPermission !== "granted") return;
+    if (crossedToTimerEnd(previous, remaining)) {
+      const title = timerEndNotificationTitle(room.phase);
+      if (title) pendingEndPhaseKeyRef.current = phaseKey;
+    } else if (
+      pendingEndPhaseKeyRef.current &&
+      pendingEndPhaseKeyRef.current !== phaseKey
+    ) {
+      pendingEndPhaseKeyRef.current = null;
+    }
+
+    const pendingKey = pendingEndPhaseKeyRef.current;
+    if (!pendingKey || pendingKey !== phaseKey) return;
+    if (notifiedPhaseKeyRef.current === pendingKey) {
+      pendingEndPhaseKeyRef.current = null;
+      return;
+    }
+
+    const livePermission =
+      typeof Notification === "undefined"
+        ? "unsupported"
+        : Notification.permission;
+    if (livePermission !== "granted") return;
 
     const title = timerEndNotificationTitle(room.phase);
     if (!title) return;
 
-    const phaseKey = `${room.phase}:${room.phaseEndsAt}`;
-    if (notifiedPhaseKeyRef.current === phaseKey) return;
-    notifiedPhaseKeyRef.current = phaseKey;
-    new Notification(title);
+    notifiedPhaseKeyRef.current = pendingKey;
+    pendingEndPhaseKeyRef.current = null;
+    try {
+      new Notification(title);
+    } catch {
+      /* browser may reject; permission UI still covers recovery */
+    }
   }, [room, now, notificationPermission]);
 
   const minutesEditable = room?.phase === "waiting" && isParticipant;
@@ -283,6 +311,8 @@ export default function RoomPage() {
 
   const remaining = remainingMs(room, now);
   const showTimer = room.phase !== "waiting" && remaining != null;
+  const timerEndedTitle =
+    showTimer && remaining <= 0 ? timerEndNotificationTitle(room.phase) : null;
   const takenByOthers = new Set(
     room.participants
       .filter((p) => p.id !== participantId)
@@ -366,6 +396,12 @@ export default function RoomPage() {
           </div>
         ) : null}
 
+        {timerEndedTitle ? (
+          <p role="status" aria-live="assertive" className={styles.timerEndNotice}>
+            {timerEndedTitle}
+          </p>
+        ) : null}
+
         <div className={styles.timerRow}>
           {showTimer ? (
             <div role="timer" aria-label="残り時間" className={styles.timer}>
@@ -419,9 +455,21 @@ export default function RoomPage() {
             <button
               type="button"
               disabled={!canStart(room)}
-              onClick={() =>
-                void postAction(`/api/rooms/${encodeURIComponent(code)}/start`)
-              }
+              onClick={() => {
+                void (async () => {
+                  void requestNotificationPermission();
+                  setDraftWork(null);
+                  setDraftBreak(null);
+                  const saved = await patchRoom({
+                    workMinutes: Number(workValue),
+                    breakMinutes: Number(breakValue),
+                  });
+                  if (!saved) return;
+                  await postAction(
+                    `/api/rooms/${encodeURIComponent(code)}/start`,
+                  );
+                })();
+              }}
             >
               スタート
             </button>
