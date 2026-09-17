@@ -190,6 +190,27 @@ class RoomPage(page: Page) : BasePage(page) {
         assertParticipantEmojiEquals(ownDisplayName, next)
     }
 
+    fun changeOwnDisplayNameViaProfile(ownDisplayName: String, newDisplayName: String) {
+        val emojiBefore = readParticipantEmoji(ownDisplayName)
+        assertProfileDialogVisible()
+        profileDisplayNameInput().fill(newDisplayName)
+        profileSaveButton().click()
+        PlaywrightAssertions.assertThat(profileDialog()).isHidden()
+        assertParticipantAvatarWithName(newDisplayName)
+        assertParticipantEmojiEquals(newDisplayName, emojiBefore)
+        assertParticipantHasYou(newDisplayName)
+    }
+
+    fun attemptChangeOwnDisplayNameViaProfile(newDisplayName: String) {
+        assertProfileDialogVisible()
+        profileDisplayNameInput().fill(newDisplayName)
+        profileSaveButton().click()
+    }
+
+    fun assertDisplayNameConflictError() {
+        PlaywrightAssertions.assertThat(displayNameConflictError()).isVisible()
+    }
+
     private fun participantEmojis(): Map<String, String> {
         PlaywrightAssertions.assertThat(participants()).isVisible()
         return participants()
@@ -216,6 +237,17 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun emojiOption(emoji: String): Locator =
         profileDialog().getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(emoji))
+
+    private fun profileDisplayNameInput(): Locator =
+        profileDialog().getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
+
+    private fun profileSaveButton(): Locator =
+        profileDialog().getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("保存"))
+
+    private fun displayNameConflictError(): Locator =
+        main.getByRole(AriaRole.ALERT).filter(
+            Locator.FilterOptions().setHasText("表示名"),
+        )
 
     private fun profileDialog(): Locator =
         playwrightPage.getByRole(AriaRole.DIALOG, Page.GetByRoleOptions().setName("プロフィール"))

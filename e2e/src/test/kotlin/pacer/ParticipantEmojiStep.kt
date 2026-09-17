@@ -102,4 +102,19 @@ class ParticipantEmojiStep {
         val expected = RoomPage(ParticipantSessions.page("Alice")).readParticipantEmoji(displayName)
         RoomPage(ParticipantSessions.page(name)).assertParticipantEmojiEquals(displayName, expected)
     }
+
+    @Step("参加者 <name> がプロフィールで表示名を <newDisplayName> に変更する")
+    fun 参加者がプロフィールで表示名を変更する(name: String, newDisplayName: String) {
+        RoomPage(ParticipantSessions.page(name)).changeOwnDisplayNameViaProfile(name, newDisplayName)
+    }
+
+    @Step("参加者 <name> がプロフィールで表示名を <newDisplayName> に変更しようとする")
+    fun 参加者がプロフィールで表示名を変更しようとする(name: String, newDisplayName: String) {
+        RoomPage(ParticipantSessions.page(name)).attemptChangeOwnDisplayNameViaProfile(newDisplayName)
+    }
+
+    @Step("参加者 <name> に表示名の重複エラーが表示されている")
+    fun 参加者に表示名の重複エラーが表示されている(name: String) {
+        RoomPage(ParticipantSessions.page(name)).assertDisplayNameConflictError()
+    }
 }
