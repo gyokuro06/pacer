@@ -64,6 +64,13 @@ export default function RoomPage() {
     setShareUrl(window.location.href);
   }, [code]);
 
+  const applyRoom = useCallback((next: Room) => {
+    setRoom((prev) => {
+      if (prev && next.lastActivityAt < prev.lastActivityAt) return prev;
+      return next;
+    });
+  }, []);
+
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
       cache: "no-store",
@@ -72,8 +79,8 @@ export default function RoomPage() {
     if (!response.ok) {
       throw new Error(data.error ?? "ルーム取得に失敗しました");
     }
-    setRoom(data.room);
-  }, [code]);
+    applyRoom(data.room);
+  }, [applyRoom, code]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,7 +132,7 @@ export default function RoomPage() {
       setError(data.error ?? "操作に失敗しました");
       return false;
     }
-    setRoom(data.room);
+    applyRoom(data.room);
     return true;
   }
 
@@ -157,8 +164,8 @@ export default function RoomPage() {
     }
   }
 
-  async function patchRoom(body: Record<string, unknown>) {
-    if (!participantId) return;
+  async function patchRoom(body: Record<string, unknown>): Promise<boolean> {
+    if (!participantId) return false;
     setError(null);
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
       method: "PATCH",
@@ -168,9 +175,10 @@ export default function RoomPage() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "更新に失敗しました");
-      return;
+      return false;
     }
-    setRoom(data.room);
+    applyRoom(data.room);
+    return true;
   }
 
   async function onJoin(event: FormEvent) {
@@ -214,7 +222,7 @@ export default function RoomPage() {
     return room.participants.find((p) => p.id === participantId) ?? null;
   }, [room, participantId]);
 
-  const minutesEditable = room?.phase === "waiting" && isParticipant;
+  const minutesEditable = isParticipant;
   const workValue = draftWork ?? (room ? String(room.workMinutes) : "");
   const breakValue = draftBreak ?? (room ? String(room.breakMinutes) : "");
   const nameValue = draftName ?? self?.displayName ?? "";
@@ -333,11 +341,14 @@ export default function RoomPage() {
                 disabled={!minutesEditable}
                 onChange={(e) => setDraftWork(e.target.value)}
                 onBlur={(e) => {
-                  if (!minutesEditable) return;
+                  if (!minutesEditable || !room) return;
                   const workMinutes = Number(e.target.value);
-                  const breakMinutes = Number(breakValue);
-                  setDraftWork(null);
-                  void patchRoom({ workMinutes, breakMinutes });
+                  const breakMinutes = Number(
+                    draftBreak ?? room.breakMinutes,
+                  );
+                  void patchRoom({ workMinutes, breakMinutes }).then((ok) => {
+                    if (ok) setDraftWork(null);
+                  });
                 }}
               />
             </label>
@@ -351,11 +362,12 @@ export default function RoomPage() {
                 disabled={!minutesEditable}
                 onChange={(e) => setDraftBreak(e.target.value)}
                 onBlur={(e) => {
-                  if (!minutesEditable) return;
+                  if (!minutesEditable || !room) return;
                   const breakMinutes = Number(e.target.value);
-                  const workMinutes = Number(workValue);
-                  setDraftBreak(null);
-                  void patchRoom({ workMinutes, breakMinutes });
+                  const workMinutes = Number(draftWork ?? room.workMinutes);
+                  void patchRoom({ workMinutes, breakMinutes }).then((ok) => {
+                    if (ok) setDraftBreak(null);
+                  });
                 }}
               />
             </label>
