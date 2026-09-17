@@ -4,10 +4,13 @@ import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.assertions.PlaywrightAssertions
 import com.microsoft.playwright.options.AriaRole
+import com.microsoft.playwright.options.RequestOptions
 import java.util.regex.Pattern
+import pacer.config
 
 class RoomPage(page: Page) : BasePage(page) {
     private val main = playwrightPage.getByRole(AriaRole.MAIN)
+    private val minutePresets = listOf("60", "30", "15", "10")
 
     fun assertOnRoomPage() {
         playwrightPage.waitForURL(Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
@@ -44,6 +47,72 @@ class RoomPage(page: Page) : BasePage(page) {
         assertWorkAndBreakMinutes(workMinutes, breakMinutes)
         PlaywrightAssertions.assertThat(workMinutesInput()).isDisabled()
         PlaywrightAssertions.assertThat(breakMinutesInput()).isDisabled()
+    }
+
+    fun selectWorkMinutesPreset(minutes: String) {
+        workPresetOption(minutes).click()
+        PlaywrightAssertions.assertThat(workPresetOption(minutes)).hasAttribute("aria-checked", "true")
+    }
+
+    fun selectBreakMinutesPreset(minutes: String) {
+        breakPresetOption(minutes).click()
+        PlaywrightAssertions.assertThat(breakPresetOption(minutes)).hasAttribute("aria-checked", "true")
+    }
+
+    fun assertWorkAndBreakPresetsSelected(workMinutes: String, breakMinutes: String) {
+        assertPresetSelected(workMinutesGroup(), workMinutes)
+        assertPresetSelected(breakMinutesGroup(), breakMinutes)
+    }
+
+    fun assertWorkAndBreakCustomValuesWithPresetsUnselected(
+        workMinutes: String,
+        breakMinutes: String,
+    ) {
+        PlaywrightAssertions.assertThat(workCurrentMinutes()).hasText(workMinutes)
+        PlaywrightAssertions.assertThat(breakCurrentMinutes()).hasText(breakMinutes)
+        assertAllPresetsUnchecked(workMinutesGroup())
+        assertAllPresetsUnchecked(breakMinutesGroup())
+    }
+
+    fun assertWorkPresetSelectedAndBreakCustomUnselected(
+        workMinutes: String,
+        breakMinutes: String,
+    ) {
+        assertPresetSelected(workMinutesGroup(), workMinutes)
+        PlaywrightAssertions.assertThat(breakCurrentMinutes()).hasText(breakMinutes)
+        assertAllPresetsUnchecked(breakMinutesGroup())
+    }
+
+    fun setWorkAndBreakMinutesViaApi(workMinutes: String, breakMinutes: String) {
+        val code = readRoomCode()
+        val participantId =
+            playwrightPage.evaluate(
+                "code => sessionStorage.getItem('pacer:' + code + ':participantId')",
+                code,
+            ) as String?
+        require(!participantId.isNullOrBlank()) {
+            "sessionStorage に参加者IDがありません: code=$code"
+        }
+        val origin = config.target.url.toString().trimEnd('/')
+        val response =
+            playwrightPage.request().patch(
+                "$origin/api/rooms/${code.trim()}",
+                RequestOptions.create()
+                    .setHeader("Content-Type", "application/json")
+                    .setData(
+                        mapOf(
+                            "participantId" to participantId,
+                            "workMinutes" to workMinutes.toInt(),
+                            "breakMinutes" to breakMinutes.toInt(),
+                        ),
+                    ),
+            )
+        require(response.ok()) {
+            "作業・休憩の API 更新に失敗しました: status=${response.status()} body=${response.text()}"
+        }
+        playwrightPage.reload()
+        assertOnRoomPage()
+        PlaywrightAssertions.assertThat(roomCode()).isVisible()
     }
 
     fun assertAutoDisplayNameVisible() {
@@ -425,6 +494,44 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun breakMinutesInput(): Locator =
         main.getByRole(AriaRole.SPINBUTTON, Locator.GetByRoleOptions().setName("休憩（分）"))
+
+    private fun workMinutesGroup(): Locator =
+        main.getByRole(AriaRole.RADIOGROUP, Locator.GetByRoleOptions().setName("作業（分）"))
+
+    private fun breakMinutesGroup(): Locator =
+        main.getByRole(AriaRole.RADIOGROUP, Locator.GetByRoleOptions().setName("休憩（分）"))
+
+    private fun workPresetOption(minutes: String): Locator =
+        workMinutesGroup().getByRole(AriaRole.RADIO, Locator.GetByRoleOptions().setName(minutes))
+
+    private fun breakPresetOption(minutes: String): Locator =
+        breakMinutesGroup().getByRole(AriaRole.RADIO, Locator.GetByRoleOptions().setName(minutes))
+
+    private fun workCurrentMinutes(): Locator =
+        main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("作業の現在（分）"))
+
+    private fun breakCurrentMinutes(): Locator =
+        main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("休憩の現在（分）"))
+
+    private fun assertPresetSelected(group: Locator, minutes: String) {
+        val selected =
+            group.getByRole(AriaRole.RADIO, Locator.GetByRoleOptions().setName(minutes))
+        PlaywrightAssertions.assertThat(selected).hasAttribute("aria-checked", "true")
+        for (preset in minutePresets) {
+            if (preset == minutes) continue
+            PlaywrightAssertions.assertThat(
+                group.getByRole(AriaRole.RADIO, Locator.GetByRoleOptions().setName(preset)),
+            ).hasAttribute("aria-checked", "false")
+        }
+    }
+
+    private fun assertAllPresetsUnchecked(group: Locator) {
+        for (preset in minutePresets) {
+            PlaywrightAssertions.assertThat(
+                group.getByRole(AriaRole.RADIO, Locator.GetByRoleOptions().setName(preset)),
+            ).hasAttribute("aria-checked", "false")
+        }
+    }
 
     private fun displayNameInput(): Locator =
         main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
