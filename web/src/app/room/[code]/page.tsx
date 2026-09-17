@@ -447,6 +447,7 @@ export default function RoomPage() {
             {room.phase === "waiting" && isParticipant ? (
               <button
                 type="button"
+                className={styles.actionPrimary}
                 disabled={!canStart(room)}
                 onClick={() => {
                   unlockAudio();
@@ -465,6 +466,7 @@ export default function RoomPage() {
             notificationPermission !== "unsupported" ? (
               <button
                 type="button"
+                className={styles.actionSecondary}
                 onClick={() => {
                   unlockAudio();
                   void requestNotificationPermission();
@@ -479,6 +481,7 @@ export default function RoomPage() {
             isParticipant ? (
               <button
                 type="button"
+                className={styles.actionSecondary}
                 onClick={() =>
                   void postAction(
                     `/api/rooms/${encodeURIComponent(code)}/propose`,
@@ -495,6 +498,7 @@ export default function RoomPage() {
             isParticipant ? (
               <button
                 type="button"
+                className={styles.actionSecondary}
                 onClick={() =>
                   void postAction(
                     `/api/rooms/${encodeURIComponent(code)}/propose`,
@@ -509,6 +513,7 @@ export default function RoomPage() {
             {room.pendingProposal != null && isParticipant ? (
               <button
                 type="button"
+                className={styles.actionPrimary}
                 onClick={() =>
                   void postAction(`/api/rooms/${encodeURIComponent(code)}/confirm`)
                 }
@@ -520,6 +525,7 @@ export default function RoomPage() {
             {!isParticipant && !showJoinDialog ? (
               <button
                 type="button"
+                className={styles.actionPrimary}
                 onClick={() => setJoinDialogOpen(true)}
               >
                 参加する
