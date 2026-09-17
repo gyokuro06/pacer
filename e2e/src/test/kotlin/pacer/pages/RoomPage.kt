@@ -6,6 +6,7 @@ import com.microsoft.playwright.assertions.PlaywrightAssertions
 import com.microsoft.playwright.options.AriaRole
 import com.microsoft.playwright.options.RequestOptions
 import java.util.regex.Pattern
+import pacer.ParticipantSessions
 import pacer.config
 
 class RoomPage(page: Page) : BasePage(page) {
@@ -210,6 +211,83 @@ class RoomPage(page: Page) : BasePage(page) {
     fun assertBreakPhase() {
         PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
     }
+
+    fun advanceTimerPastEnd() {
+        ParticipantSessions.ensureClockInstalled(playwrightPage)
+        playwrightPage.clock().fastForward(61_000)
+    }
+
+    fun advanceTimerBySeconds(seconds: Long) {
+        ParticipantSessions.ensureClockInstalled(playwrightPage)
+        playwrightPage.clock().fastForward(seconds * 1_000)
+    }
+
+    fun assertRemainingTime(mmSs: String) {
+        PlaywrightAssertions.assertThat(remainingTime()).hasText(mmSs)
+    }
+
+    fun assertBrowserNotificationCount(title: String, expectedCount: Int) {
+        playwrightPage.waitForFunction(
+            """({ title, expectedCount }) => {
+                 const list = window.__pacerNotifications || [];
+                 return list.filter((n) => String(n.title).includes(title)).length === expectedCount;
+               }""",
+            mapOf("title" to title, "expectedCount" to expectedCount),
+            Page.WaitForFunctionOptions().setTimeout(10_000.0),
+        )
+        @Suppress("UNCHECKED_CAST")
+        val titles =
+            playwrightPage.evaluate(
+                """title => (window.__pacerNotifications || [])
+                     .filter(n => String(n.title).includes(title))
+                     .map(n => n.title)""",
+                title,
+            ) as List<*>
+        require(titles.size == expectedCount) {
+            "ブラウザ通知「$title」の回数が一致しません: actual=${titles.size} expected=$expectedCount titles=$titles"
+        }
+    }
+
+    fun assertEndChimePlayCount(expectedCount: Int) {
+        playwrightPage.waitForFunction(
+            """expectedCount => (window.__pacerChimePlays || []).length === expectedCount""",
+            expectedCount,
+            Page.WaitForFunctionOptions().setTimeout(10_000.0),
+        )
+        @Suppress("UNCHECKED_CAST")
+        val plays =
+            playwrightPage.evaluate("() => window.__pacerChimePlays || []") as List<*>
+        require(plays.size == expectedCount) {
+            "終了チャイムの再生回数が一致しません: actual=${plays.size} expected=$expectedCount plays=$plays"
+        }
+    }
+
+    fun assertNotificationPermissionRequested() {
+        playwrightPage.waitForFunction(
+            "() => (window.__pacerPermissionRequests || 0) >= 1",
+            null,
+            Page.WaitForFunctionOptions().setTimeout(10_000.0),
+        )
+    }
+
+    fun assertEnableNotificationsVisible() {
+        PlaywrightAssertions.assertThat(enableNotificationsButton()).isVisible()
+    }
+
+    fun assertNotificationsGranted() {
+        playwrightPage.waitForFunction(
+            "() => Notification.permission === 'granted'",
+            null,
+            Page.WaitForFunctionOptions().setTimeout(5_000.0),
+        )
+    }
+
+    fun clickEnableNotifications() {
+        enableNotificationsButton().click()
+    }
+
+    private fun enableNotificationsButton(): Locator =
+        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("通知をオン"))
 
     fun assertParticipantAvatarWithName(displayName: String) {
         PlaywrightAssertions.assertThat(participantItem(displayName)).isVisible()

@@ -11,10 +11,12 @@ import {
 import { useParams } from "next/navigation";
 import {
   canStart,
+  crossedToTimerEnd,
   formatRemainingMs,
   PARTICIPANT_EMOJIS,
   phaseLabel,
   remainingMs,
+  timerEndNotificationTitle,
   type Room,
 } from "@/lib/room";
 import styles from "./page.module.css";
@@ -26,8 +28,51 @@ function isMinutePreset(value: number): boolean {
   return (MINUTE_PRESETS as readonly number[]).includes(value);
 }
 
+const TIMER_END_CHIME_URL = "/timer-end-chime.wav";
+
+type NotificationPermissionState = NotificationPermission | "unsupported";
+
+let timerEndChime: HTMLAudioElement | null = null;
+
 function participantStorageKey(code: string) {
   return `pacer:${code}:participantId`;
+}
+
+function getTimerEndChime(): HTMLAudioElement {
+  if (!timerEndChime) {
+    timerEndChime = new Audio(TIMER_END_CHIME_URL);
+    timerEndChime.preload = "auto";
+  }
+  return timerEndChime;
+}
+
+function unlockAudio() {
+  try {
+    const audio = getTimerEndChime();
+    audio.load();
+    audio.muted = true;
+    audio.volume = 0;
+    const primed = audio.play();
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
+    audio.volume = 1;
+    void primed.catch(() => undefined);
+  } catch {
+    /* best-effort unlock via existing clicks */
+  }
+}
+
+function playTimerEndChime() {
+  try {
+    const audio = getTimerEndChime();
+    audio.muted = false;
+    audio.volume = 1;
+    audio.currentTime = 0;
+    void audio.play().catch(() => undefined);
+  } catch {
+    /* autoplay / decode may fail; notification path is independent */
+  }
 }
 
 function readParticipantId(code: string): string | null {
@@ -56,8 +101,14 @@ export default function RoomPage() {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState("");
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>("default");
   const profileOpenRef = useRef(false);
   profileOpenRef.current = profileOpen;
+  const previousRemainingRef = useRef<number | null>(null);
+  const notifiedPhaseKeyRef = useRef<string | null>(null);
+  const pendingEndPhaseKeyRef = useRef<string | null>(null);
+  const chimedPhaseKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -160,8 +211,8 @@ export default function RoomPage() {
     }
   }
 
-  async function patchRoom(body: Record<string, unknown>) {
-    if (!participantId) return;
+  async function patchRoom(body: Record<string, unknown>): Promise<boolean> {
+    if (!participantId) return false;
     setError(null);
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
       method: "PATCH",
@@ -171,13 +222,15 @@ export default function RoomPage() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "更新に失敗しました");
-      return;
+      return false;
     }
     setRoom(data.room);
+    return true;
   }
 
   async function onJoin(event: FormEvent) {
     event.preventDefault();
+    unlockAudio();
     setError(null);
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}/join`, {
       method: "POST",
@@ -217,6 +270,82 @@ export default function RoomPage() {
     return room.participants.find((p) => p.id === participantId) ?? null;
   }, [room, participantId]);
 
+  const readNotificationPermission = useCallback((): NotificationPermissionState => {
+    if (typeof Notification === "undefined") return "unsupported";
+    return Notification.permission;
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setNotificationPermission(result);
+  }, []);
+
+  useEffect(() => {
+    setNotificationPermission(readNotificationPermission());
+  }, [readNotificationPermission]);
+
+  useEffect(() => {
+    if (!isParticipant) return;
+    void requestNotificationPermission();
+  }, [isParticipant, requestNotificationPermission]);
+
+  useEffect(() => {
+    if (!room || room.phase === "waiting") {
+      previousRemainingRef.current = null;
+      pendingEndPhaseKeyRef.current = null;
+      return;
+    }
+
+    const phaseKey = `${room.phase}:${room.phaseEndsAt}`;
+    const remaining = remainingMs(room, now);
+    const previous = previousRemainingRef.current;
+    previousRemainingRef.current = remaining;
+
+    if (crossedToTimerEnd(previous, remaining)) {
+      const title = timerEndNotificationTitle(room.phase);
+      if (title) {
+        pendingEndPhaseKeyRef.current = phaseKey;
+        if (chimedPhaseKeyRef.current !== phaseKey) {
+          chimedPhaseKeyRef.current = phaseKey;
+          playTimerEndChime();
+        }
+      }
+    } else if (
+      pendingEndPhaseKeyRef.current &&
+      pendingEndPhaseKeyRef.current !== phaseKey
+    ) {
+      pendingEndPhaseKeyRef.current = null;
+    }
+
+    const pendingKey = pendingEndPhaseKeyRef.current;
+    if (!pendingKey || pendingKey !== phaseKey) return;
+    if (notifiedPhaseKeyRef.current === pendingKey) {
+      pendingEndPhaseKeyRef.current = null;
+      return;
+    }
+
+    const livePermission =
+      typeof Notification === "undefined"
+        ? "unsupported"
+        : Notification.permission;
+    if (livePermission !== "granted") return;
+
+    const title = timerEndNotificationTitle(room.phase);
+    if (!title) return;
+
+    notifiedPhaseKeyRef.current = pendingKey;
+    pendingEndPhaseKeyRef.current = null;
+    try {
+      new Notification(title);
+    } catch {
+      /* browser may reject; permission UI still covers recovery */
+    }
+  }, [room, now, notificationPermission]);
+
   const minutesEditable = room?.phase === "waiting" && isParticipant;
   const nameValue = draftName ?? self?.displayName ?? "";
 
@@ -232,6 +361,8 @@ export default function RoomPage() {
 
   const remaining = remainingMs(room, now);
   const showTimer = room.phase !== "waiting" && remaining != null;
+  const timerEndedTitle =
+    showTimer && remaining <= 0 ? timerEndNotificationTitle(room.phase) : null;
   const takenByOthers = new Set(
     room.participants
       .filter((p) => p.id !== participantId)
@@ -313,6 +444,12 @@ export default function RoomPage() {
           <div role="status" aria-label="フェーズ" className={styles.phase}>
             {phaseLabel(room.phase)}
           </div>
+        ) : null}
+
+        {timerEndedTitle ? (
+          <p role="status" aria-live="assertive" className={styles.timerEndNotice}>
+            {timerEndedTitle}
+          </p>
         ) : null}
 
         <div className={styles.timerRow}>
@@ -402,11 +539,38 @@ export default function RoomPage() {
             <button
               type="button"
               disabled={!canStart(room)}
-              onClick={() =>
-                void postAction(`/api/rooms/${encodeURIComponent(code)}/start`)
-              }
+              onClick={() => {
+                unlockAudio();
+                void (async () => {
+                  void requestNotificationPermission();
+                  setDraftWork(null);
+                  setDraftBreak(null);
+                  const saved = await patchRoom({
+                    workMinutes: Number(workValue),
+                    breakMinutes: Number(breakValue),
+                  });
+                  if (!saved) return;
+                  await postAction(
+                    `/api/rooms/${encodeURIComponent(code)}/start`,
+                  );
+                })();
+              }}
             >
               スタート
+            </button>
+          ) : null}
+
+          {isParticipant &&
+          notificationPermission !== "granted" &&
+          notificationPermission !== "unsupported" ? (
+            <button
+              type="button"
+              onClick={() => {
+                unlockAudio();
+                void requestNotificationPermission();
+              }}
+            >
+              通知をオン
             </button>
           ) : null}
 
