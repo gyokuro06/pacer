@@ -152,6 +152,14 @@ export default function RoomPage() {
           ) : null}
         </div>
 
+        <ul aria-label="参加者" className={styles.participants}>
+          {room.participants.map((participant) => (
+            <li key={participant.id} className={styles.participant}>
+              {participant.emoji} {participant.displayName}
+            </li>
+          ))}
+        </ul>
+
         {error ? <p className={styles.error}>{error}</p> : null}
       </main>
     </div>

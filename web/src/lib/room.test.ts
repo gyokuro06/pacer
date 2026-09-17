@@ -7,6 +7,8 @@ import {
   isRoomExpired,
   joinRoomState,
   MAX_PARTICIPANTS,
+  PARTICIPANT_EMOJIS,
+  pickUnusedEmoji,
   proposeState,
   SESSION_REJOIN_TTL_MS,
   startSessionState,
@@ -23,6 +25,40 @@ describe("formatRemainingMs", () => {
 
   it("ceils partial seconds", () => {
     assert.equal(formatRemainingMs(1500), "00:02");
+  });
+});
+
+describe("pickUnusedEmoji", () => {
+  it("picks the first emoji when none used", () => {
+    assert.equal(pickUnusedEmoji([]), PARTICIPANT_EMOJIS[0]);
+  });
+
+  it("skips used emojis", () => {
+    assert.equal(
+      pickUnusedEmoji([PARTICIPANT_EMOJIS[0], PARTICIPANT_EMOJIS[1]]),
+      PARTICIPANT_EMOJIS[2],
+    );
+  });
+
+  it("throws when the pool is exhausted", () => {
+    assert.throws(
+      () => pickUnusedEmoji([...PARTICIPANT_EMOJIS]),
+      /利用可能な絵文字がありません/,
+    );
+  });
+});
+
+describe("emoji auto-assign on create and join", () => {
+  it("assigns distinct unused emojis to new participants", () => {
+    const room = createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF");
+    assert.equal(room.participants[0]?.emoji, PARTICIPANT_EMOJIS[0]);
+
+    const withBob = joinRoomState(room, { id: "b", displayName: "Bob" }).room;
+    assert.equal(withBob.participants[1]?.emoji, PARTICIPANT_EMOJIS[1]);
+    assert.notEqual(
+      withBob.participants[0]?.emoji,
+      withBob.participants[1]?.emoji,
+    );
   });
 });
 

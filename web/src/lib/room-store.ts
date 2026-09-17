@@ -5,7 +5,7 @@ import {
   joinRoomState,
   proposeState,
   startSessionState,
-  type Participant,
+  type ParticipantInput,
   type ProposalKind,
   type Room,
 } from "./room";
@@ -55,7 +55,7 @@ export async function getRoom(
 export async function createRoom(
   workMinutes: number,
   breakMinutes: number,
-  creator: Participant,
+  creator: ParticipantInput,
 ): Promise<Room> {
   const room = createRoomState(workMinutes, breakMinutes, creator);
   await persist(room);
@@ -64,7 +64,7 @@ export async function createRoom(
 
 export async function joinRoom(
   code: string,
-  participant: Participant,
+  participant: ParticipantInput,
 ): Promise<{ room: Room; participantId: string }> {
   const existing = await getRoom(code);
   if (!existing) {
