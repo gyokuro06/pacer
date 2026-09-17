@@ -22,11 +22,35 @@ import {
 import styles from "./page.module.css";
 
 const POLL_MS = 500;
+const TIMER_END_CHIME_URL = "/timer-end-chime.wav";
 
 type NotificationPermissionState = NotificationPermission | "unsupported";
 
 function participantStorageKey(code: string) {
   return `pacer:${code}:participantId`;
+}
+
+function unlockAudio() {
+  try {
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    void ctx.resume();
+  } catch {
+    /* best-effort unlock via existing clicks */
+  }
+}
+
+function playTimerEndChime() {
+  try {
+    const audio = new Audio(TIMER_END_CHIME_URL);
+    void audio.play().catch(() => undefined);
+  } catch {
+    /* autoplay / decode may fail; notification path is independent */
+  }
 }
 
 function readParticipantId(code: string): string | null {
@@ -64,6 +88,7 @@ export default function RoomPage() {
   const previousRemainingRef = useRef<number | null>(null);
   const notifiedPhaseKeyRef = useRef<string | null>(null);
   const pendingEndPhaseKeyRef = useRef<string | null>(null);
+  const chimedPhaseKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -185,6 +210,7 @@ export default function RoomPage() {
 
   async function onJoin(event: FormEvent) {
     event.preventDefault();
+    unlockAudio();
     setError(null);
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}/join`, {
       method: "POST",
@@ -261,7 +287,13 @@ export default function RoomPage() {
 
     if (crossedToTimerEnd(previous, remaining)) {
       const title = timerEndNotificationTitle(room.phase);
-      if (title) pendingEndPhaseKeyRef.current = phaseKey;
+      if (title) {
+        pendingEndPhaseKeyRef.current = phaseKey;
+        if (chimedPhaseKeyRef.current !== phaseKey) {
+          chimedPhaseKeyRef.current = phaseKey;
+          playTimerEndChime();
+        }
+      }
     } else if (
       pendingEndPhaseKeyRef.current &&
       pendingEndPhaseKeyRef.current !== phaseKey
@@ -456,6 +488,7 @@ export default function RoomPage() {
               type="button"
               disabled={!canStart(room)}
               onClick={() => {
+                unlockAudio();
                 void (async () => {
                   void requestNotificationPermission();
                   setDraftWork(null);
@@ -480,7 +513,10 @@ export default function RoomPage() {
           notificationPermission !== "unsupported" ? (
             <button
               type="button"
-              onClick={() => void requestNotificationPermission()}
+              onClick={() => {
+                unlockAudio();
+                void requestNotificationPermission();
+              }}
             >
               通知をオン
             </button>
