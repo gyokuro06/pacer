@@ -22,6 +22,12 @@ import {
 import styles from "./page.module.css";
 
 const POLL_MS = 500;
+const MINUTE_PRESETS = [60, 30, 15, 10] as const;
+
+function isMinutePreset(value: number): boolean {
+  return (MINUTE_PRESETS as readonly number[]).includes(value);
+}
+
 const TIMER_END_CHIME_URL = "/timer-end-chime.wav";
 
 type NotificationPermissionState = NotificationPermission | "unsupported";
@@ -92,8 +98,6 @@ export default function RoomPage() {
   const [joinName, setJoinName] = useState("");
   const [shareUrl, setShareUrl] = useState("");
   const [copyDone, setCopyDone] = useState(false);
-  const [draftWork, setDraftWork] = useState<string | null>(null);
-  const [draftBreak, setDraftBreak] = useState<string | null>(null);
   const [draftName, setDraftName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState("");
@@ -343,8 +347,6 @@ export default function RoomPage() {
   }, [room, now, notificationPermission]);
 
   const minutesEditable = room?.phase === "waiting" && isParticipant;
-  const workValue = draftWork ?? (room ? String(room.workMinutes) : "");
-  const breakValue = draftBreak ?? (room ? String(room.breakMinutes) : "");
   const nameValue = draftName ?? self?.displayName ?? "";
 
   if (!room) {
@@ -459,42 +461,76 @@ export default function RoomPage() {
             <div className={styles.timerPlaceholder} aria-hidden="true" />
           )}
           <div className={styles.minutes}>
-            <label className={styles.field}>
+            <div className={styles.field}>
               <span>作業（分）</span>
-              <input
-                type="number"
-                min={1}
+              {!isMinutePreset(room.workMinutes) ? (
+                <div
+                  role="status"
+                  aria-label="作業の現在（分）"
+                  className={styles.currentMinutes}
+                >
+                  {room.workMinutes}
+                </div>
+              ) : null}
+              <div
+                role="radiogroup"
                 aria-label="作業（分）"
-                value={workValue}
-                disabled={!minutesEditable}
-                onChange={(e) => setDraftWork(e.target.value)}
-                onBlur={(e) => {
-                  if (!minutesEditable) return;
-                  const workMinutes = Number(e.target.value);
-                  const breakMinutes = Number(breakValue);
-                  setDraftWork(null);
-                  void patchRoom({ workMinutes, breakMinutes });
-                }}
-              />
-            </label>
-            <label className={styles.field}>
+                className={styles.presetGroup}
+              >
+                {MINUTE_PRESETS.map((minutes) => (
+                  <button
+                    key={`work-${minutes}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={room.workMinutes === minutes}
+                    aria-label={String(minutes)}
+                    className={styles.presetOption}
+                    disabled={!minutesEditable}
+                    onClick={() => {
+                      if (!minutesEditable) return;
+                      void patchRoom({ workMinutes: minutes });
+                    }}
+                  >
+                    {minutes}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.field}>
               <span>休憩（分）</span>
-              <input
-                type="number"
-                min={1}
+              {!isMinutePreset(room.breakMinutes) ? (
+                <div
+                  role="status"
+                  aria-label="休憩の現在（分）"
+                  className={styles.currentMinutes}
+                >
+                  {room.breakMinutes}
+                </div>
+              ) : null}
+              <div
+                role="radiogroup"
                 aria-label="休憩（分）"
-                value={breakValue}
-                disabled={!minutesEditable}
-                onChange={(e) => setDraftBreak(e.target.value)}
-                onBlur={(e) => {
-                  if (!minutesEditable) return;
-                  const breakMinutes = Number(e.target.value);
-                  const workMinutes = Number(workValue);
-                  setDraftBreak(null);
-                  void patchRoom({ workMinutes, breakMinutes });
-                }}
-              />
-            </label>
+                className={styles.presetGroup}
+              >
+                {MINUTE_PRESETS.map((minutes) => (
+                  <button
+                    key={`break-${minutes}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={room.breakMinutes === minutes}
+                    aria-label={String(minutes)}
+                    className={styles.presetOption}
+                    disabled={!minutesEditable}
+                    onClick={() => {
+                      if (!minutesEditable) return;
+                      void patchRoom({ breakMinutes: minutes });
+                    }}
+                  >
+                    {minutes}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -505,19 +541,10 @@ export default function RoomPage() {
               disabled={!canStart(room)}
               onClick={() => {
                 unlockAudio();
-                void (async () => {
-                  void requestNotificationPermission();
-                  setDraftWork(null);
-                  setDraftBreak(null);
-                  const saved = await patchRoom({
-                    workMinutes: Number(workValue),
-                    breakMinutes: Number(breakValue),
-                  });
-                  if (!saved) return;
-                  await postAction(
-                    `/api/rooms/${encodeURIComponent(code)}/start`,
-                  );
-                })();
+                void requestNotificationPermission();
+                void postAction(
+                  `/api/rooms/${encodeURIComponent(code)}/start`,
+                );
               }}
             >
               スタート
