@@ -1,10 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams } from "next/navigation";
 import {
   canStart,
   formatRemainingMs,
+  PARTICIPANT_EMOJIS,
   phaseLabel,
   remainingMs,
   type Room,
@@ -19,7 +27,11 @@ function participantStorageKey(code: string) {
 
 function readParticipantId(code: string): string | null {
   if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(participantStorageKey(code));
+  try {
+    return sessionStorage.getItem(participantStorageKey(code));
+  } catch {
+    return null;
+  }
 }
 
 function storeParticipant(code: string, participantId: string) {
@@ -39,6 +51,10 @@ export default function RoomPage() {
   const [draftWork, setDraftWork] = useState<string | null>(null);
   const [draftBreak, setDraftBreak] = useState<string | null>(null);
   const [draftName, setDraftName] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileDisplayName, setProfileDisplayName] = useState("");
+  const profileOpenRef = useRef(false);
+  profileOpenRef.current = profileOpen;
 
   useEffect(() => {
     setParticipantId(readParticipantId(code));
@@ -64,7 +80,7 @@ export default function RoomPage() {
     const tick = async () => {
       try {
         await refresh();
-        if (!cancelled) setError(null);
+        if (!cancelled && !profileOpenRef.current) setError(null);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "同期に失敗しました");
@@ -81,10 +97,22 @@ export default function RoomPage() {
     };
   }, [refresh]);
 
-  async function postAction(path: string, body?: Record<string, unknown>) {
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [profileOpen]);
+
+  async function postAction(
+    path: string,
+    body?: Record<string, unknown>,
+  ): Promise<boolean> {
     if (!participantId) {
       setError("参加が必要です");
-      return;
+      return false;
     }
     setError(null);
     const response = await fetch(path, {
@@ -95,9 +123,38 @@ export default function RoomPage() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "操作に失敗しました");
-      return;
+      return false;
     }
     setRoom(data.room);
+    return true;
+  }
+
+  function openProfile(displayName: string) {
+    setProfileDisplayName(displayName);
+    setError(null);
+    setProfileOpen(true);
+  }
+
+  async function selectEmoji(emoji: string) {
+    if (!participantId) return;
+    const ok = await postAction(`/api/rooms/${encodeURIComponent(code)}/emoji`, {
+      emoji,
+    });
+    if (ok) setProfileOpen(false);
+  }
+
+  async function saveDisplayName() {
+    if (!participantId) return;
+    const ok = await postAction(
+      `/api/rooms/${encodeURIComponent(code)}/display-name`,
+      {
+        displayName: profileDisplayName,
+      },
+    );
+    if (ok) {
+      setDraftName(null);
+      setProfileOpen(false);
+    }
   }
 
   async function patchRoom(body: Record<string, unknown>) {
@@ -174,6 +231,11 @@ export default function RoomPage() {
 
   const remaining = remainingMs(room, now);
   const showTimer = room.phase !== "waiting" && remaining != null;
+  const takenByOthers = new Set(
+    room.participants
+      .filter((p) => p.id !== participantId)
+      .map((p) => p.emoji),
+  );
 
   return (
     <div className={styles.page}>
@@ -208,7 +270,9 @@ export default function RoomPage() {
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
           </button>
-          {copyDone ? <span className={styles.copyHint}>コピーしました</span> : null}
+          {copyDone ? (
+            <span className={styles.copyHint}>コピーしました</span>
+          ) : null}
         </div>
 
         {isParticipant && self ? (
@@ -317,9 +381,10 @@ export default function RoomPage() {
             <button
               type="button"
               onClick={() =>
-                void postAction(`/api/rooms/${encodeURIComponent(code)}/propose`, {
-                  kind: "break",
-                })
+                void postAction(
+                  `/api/rooms/${encodeURIComponent(code)}/propose`,
+                  { kind: "break" },
+                )
               }
             >
               休憩を提案
@@ -332,9 +397,10 @@ export default function RoomPage() {
             <button
               type="button"
               onClick={() =>
-                void postAction(`/api/rooms/${encodeURIComponent(code)}/propose`, {
-                  kind: "work",
-                })
+                void postAction(
+                  `/api/rooms/${encodeURIComponent(code)}/propose`,
+                  { kind: "work" },
+                )
               }
             >
               再開を提案
@@ -353,7 +419,92 @@ export default function RoomPage() {
           ) : null}
         </div>
 
-        {error ? <p className={styles.error}>{error}</p> : null}
+        <ul aria-label="参加者" className={styles.participants}>
+          {room.participants.map((participant) => {
+            const isSelf = participant.id === participantId;
+            return (
+              <li key={participant.id} className={styles.participant}>
+                {isSelf ? (
+                  <button
+                    type="button"
+                    className={styles.avatar}
+                    aria-label={`${participant.displayName}のアバター`}
+                    onClick={() => openProfile(participant.displayName)}
+                  >
+                    {participant.emoji}
+                  </button>
+                ) : (
+                  <span
+                    className={styles.avatar}
+                    aria-label={`${participant.displayName}のアバター`}
+                  >
+                    {participant.emoji}
+                  </span>
+                )}
+                {isSelf ? (
+                  <button
+                    type="button"
+                    className={styles.displayName}
+                    onClick={() => openProfile(participant.displayName)}
+                  >
+                    {participant.displayName}
+                  </button>
+                ) : (
+                  <span className={styles.displayName}>
+                    {participant.displayName}
+                  </span>
+                )}
+                {isSelf ? <span className={styles.youLabel}>You</span> : null}
+              </li>
+            );
+          })}
+        </ul>
+
+        {profileOpen ? (
+          <div className={styles.profileBackdrop}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="プロフィール"
+              className={styles.profileDialog}
+            >
+              <label className={styles.profileField}>
+                <span>表示名</span>
+                <input
+                  type="text"
+                  aria-label="表示名"
+                  value={profileDisplayName}
+                  onChange={(e) => setProfileDisplayName(e.target.value)}
+                />
+              </label>
+              <div className={styles.emojiOptions}>
+                {PARTICIPANT_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    disabled={takenByOthers.has(emoji)}
+                    onClick={() => void selectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={styles.profileSave}
+                onClick={() => void saveDisplayName()}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {error ? (
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+        ) : null}
       </main>
     </div>
   );

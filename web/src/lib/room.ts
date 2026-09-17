@@ -5,6 +5,13 @@ export type ProposalKind = "break" | "work";
 export type Participant = {
   id: string;
   displayName: string;
+  emoji: string;
+};
+
+export type ParticipantInput = {
+  id: string;
+  displayName: string;
+  emoji?: string;
 };
 
 export type Room = {
@@ -24,6 +31,100 @@ export const DEFAULT_WORK_MINUTES = 60;
 export const DEFAULT_BREAK_MINUTES = 10;
 export const SESSION_REJOIN_TTL_HOURS = 24;
 export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
+
+export const PARTICIPANT_EMOJIS = [
+  "🦊",
+  "🐸",
+  "🦉",
+  "🐙",
+  "🐱",
+  "🐼",
+  "🦄",
+  "🐧",
+] as const;
+
+export function pickUnusedEmoji(usedEmojis: readonly string[]): string {
+  const used = new Set(usedEmojis);
+  const next = PARTICIPANT_EMOJIS.find((emoji) => !used.has(emoji));
+  if (!next) {
+    throw new Error("利用可能な絵文字がありません");
+  }
+  return next;
+}
+
+export function isParticipantEmoji(
+  value: string,
+): value is (typeof PARTICIPANT_EMOJIS)[number] {
+  return (PARTICIPANT_EMOJIS as readonly string[]).includes(value);
+}
+
+export function changeParticipantEmojiState(
+  room: Room,
+  participantId: string,
+  emoji: string,
+  now = Date.now(),
+): Room {
+  if (!isParticipantEmoji(emoji)) {
+    throw new Error("その絵文字は選べません");
+  }
+  const self = room.participants.find((p) => p.id === participantId);
+  if (!self) {
+    throw new Error("参加者が見つかりません");
+  }
+  const takenByOther = room.participants.some(
+    (p) => p.id !== participantId && p.emoji === emoji,
+  );
+  if (takenByOther) {
+    throw new Error("その絵文字は他の参加者が使用中です");
+  }
+  return {
+    ...room,
+    participants: room.participants.map((p) =>
+      p.id === participantId ? { ...p, emoji } : p,
+    ),
+    lastActivityAt: now,
+  };
+}
+
+export function changeParticipantDisplayNameState(
+  room: Room,
+  participantId: string,
+  displayName: string,
+  now = Date.now(),
+): Room {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    throw new Error("表示名は必須です");
+  }
+  const self = room.participants.find((p) => p.id === participantId);
+  if (!self) {
+    throw new Error("参加者が見つかりません");
+  }
+  const takenByOther = room.participants.some(
+    (p) => p.id !== participantId && p.displayName === trimmed,
+  );
+  if (takenByOther) {
+    throw new Error("その表示名は他の参加者が使用中です");
+  }
+  return {
+    ...room,
+    participants: room.participants.map((p) =>
+      p.id === participantId ? { ...p, displayName: trimmed } : p,
+    ),
+    lastActivityAt: now,
+  };
+}
+
+function withAssignedEmoji(
+  participant: ParticipantInput,
+  usedEmojis: readonly string[],
+): Participant {
+  return {
+    id: participant.id,
+    displayName: participant.displayName,
+    emoji: participant.emoji ?? pickUnusedEmoji(usedEmojis),
+  };
+}
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -109,7 +210,7 @@ export function isRoomExpired(
 export function createRoomState(
   workMinutes: number,
   breakMinutes: number,
-  creator: Participant,
+  creator: ParticipantInput,
   code = generateRoomCode(),
   now = Date.now(),
 ): Room {
@@ -117,7 +218,7 @@ export function createRoomState(
     code,
     workMinutes,
     breakMinutes,
-    participants: [creator],
+    participants: [withAssignedEmoji(creator, [])],
     phase: "waiting",
     phaseEndsAt: null,
     pendingProposal: null,
@@ -127,7 +228,7 @@ export function createRoomState(
 
 export function joinRoomState(
   room: Room,
-  participant: Participant,
+  participant: ParticipantInput,
   now = Date.now(),
   ttlMs = SESSION_REJOIN_TTL_MS,
 ): { room: Room; participantId: string } {
@@ -147,13 +248,17 @@ export function joinRoomState(
   if (room.participants.length >= MAX_PARTICIPANTS) {
     throw new Error("ルームは満員です");
   }
+  const joined = withAssignedEmoji(
+    participant,
+    room.participants.map((p) => p.emoji),
+  );
   return {
     room: {
       ...room,
-      participants: [...room.participants, participant],
+      participants: [...room.participants, joined],
       lastActivityAt: now,
     },
-    participantId: participant.id,
+    participantId: joined.id,
   };
 }
 
@@ -199,18 +304,12 @@ export function updateDisplayNameState(
   displayName: string,
   now = Date.now(),
 ): Room {
-  const trimmed = displayName.trim();
-  if (!trimmed) {
-    throw new Error("表示名は必須です");
-  }
-  const index = room.participants.findIndex((p) => p.id === participantId);
-  if (index < 0) {
-    throw new Error("参加者が見つかりません");
-  }
-  const participants = room.participants.map((p, i) =>
-    i === index ? { ...p, displayName: trimmed } : p,
+  return changeParticipantDisplayNameState(
+    room,
+    participantId,
+    displayName,
+    now,
   );
-  return { ...room, participants, lastActivityAt: now };
 }
 
 export function proposeState(

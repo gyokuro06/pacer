@@ -1,4 +1,6 @@
 import {
+  changeParticipantDisplayNameState,
+  changeParticipantEmojiState,
   confirmProposalState,
   createRoomState,
   isRoomExpired,
@@ -7,7 +9,7 @@ import {
   startSessionState,
   updateDisplayNameState,
   updateRoomMinutesState,
-  type Participant,
+  type ParticipantInput,
   type ProposalKind,
   type Room,
 } from "./room";
@@ -57,7 +59,7 @@ export async function getRoom(
 export async function createRoom(
   workMinutes: number,
   breakMinutes: number,
-  creator: Participant,
+  creator: ParticipantInput,
 ): Promise<Room> {
   const room = createRoomState(workMinutes, breakMinutes, creator);
   await persist(room);
@@ -66,7 +68,7 @@ export async function createRoom(
 
 export async function joinRoom(
   code: string,
-  participant: Participant,
+  participant: ParticipantInput,
 ): Promise<{ room: Room; participantId: string }> {
   const existing = await getRoom(code);
   if (!existing) {
@@ -131,6 +133,38 @@ export async function confirm(code: string): Promise<Room> {
     throw new Error("ルームが見つかりません");
   }
   const updated = confirmProposalState(existing);
+  await persist(updated);
+  return updated;
+}
+
+export async function changeParticipantEmoji(
+  code: string,
+  participantId: string,
+  emoji: string,
+): Promise<Room> {
+  const existing = await getRoom(code);
+  if (!existing) {
+    throw new Error("ルームが見つかりません");
+  }
+  const updated = changeParticipantEmojiState(existing, participantId, emoji);
+  await persist(updated);
+  return updated;
+}
+
+export async function changeParticipantDisplayName(
+  code: string,
+  participantId: string,
+  displayName: string,
+): Promise<Room> {
+  const existing = await getRoom(code);
+  if (!existing) {
+    throw new Error("ルームが見つかりません");
+  }
+  const updated = changeParticipantDisplayNameState(
+    existing,
+    participantId,
+    displayName,
+  );
   await persist(updated);
   return updated;
 }
