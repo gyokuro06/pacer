@@ -1,0 +1,42 @@
+---
+description: How to start the app locally and run unit / Gauge tests
+alwaysApply: true
+---
+
+# Local run & tests
+
+## App (Next.js)
+
+```bash
+cd web
+npm install   # first time / after lockfile changes
+npm run dev   # http://localhost:3000
+```
+
+Room store defaults to `web/.data/rooms.json` when unset (see root `README.md`).
+
+## Unit tests
+
+```bash
+cd web
+npm run test:unit
+```
+
+## Gauge E2E (Playwright)
+
+Requires the app on the target URL (default `http://localhost:3000` from `e2e/src/test/resources/config.toml`; override with `TARGET_URL`).
+
+```bash
+# terminal A — keep running
+cd web && npm run dev
+
+# terminal B
+cd e2e
+mise install
+mise exec -- mvn test-compile
+mise exec -- mvn gauge:execute
+# one spec:
+mise exec -- mvn -DspecsDir=specs/<name>.spec gauge:execute
+```
+
+Use `mise exec --` so Gauge/Java match `e2e/mise.toml`. Do not invent alternate runners.
