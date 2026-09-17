@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FocusEvent,
   FormEvent,
   useCallback,
   useEffect,
@@ -181,6 +182,38 @@ export default function RoomPage() {
     return true;
   }
 
+  function isMinutesInput(target: EventTarget | null): boolean {
+    return (
+      target instanceof HTMLInputElement &&
+      (target.getAttribute("aria-label") === "作業（分）" ||
+        target.getAttribute("aria-label") === "休憩（分）")
+    );
+  }
+
+  function commitMinutesFromBlur(
+    event: FocusEvent<HTMLInputElement>,
+  ) {
+    if (!minutesEditable || !room) return;
+    if (isMinutesInput(event.relatedTarget)) return;
+    const container = event.currentTarget.closest(`.${styles.minutes}`);
+    if (!container) return;
+    const workInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="作業（分）"]',
+    );
+    const breakInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="休憩（分）"]',
+    );
+    if (!workInput || !breakInput) return;
+    const workMinutes = Number(workInput.value);
+    const breakMinutes = Number(breakInput.value);
+    void patchRoom({ workMinutes, breakMinutes }).then((ok) => {
+      if (ok) {
+        setDraftWork(null);
+        setDraftBreak(null);
+      }
+    });
+  }
+
   async function onJoin(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -340,16 +373,7 @@ export default function RoomPage() {
                 value={workValue}
                 disabled={!minutesEditable}
                 onChange={(e) => setDraftWork(e.target.value)}
-                onBlur={(e) => {
-                  if (!minutesEditable || !room) return;
-                  const workMinutes = Number(e.target.value);
-                  const breakMinutes = Number(
-                    draftBreak ?? room.breakMinutes,
-                  );
-                  void patchRoom({ workMinutes, breakMinutes }).then((ok) => {
-                    if (ok) setDraftWork(null);
-                  });
-                }}
+                onBlur={commitMinutesFromBlur}
               />
             </label>
             <label className={styles.field}>
@@ -361,14 +385,7 @@ export default function RoomPage() {
                 value={breakValue}
                 disabled={!minutesEditable}
                 onChange={(e) => setDraftBreak(e.target.value)}
-                onBlur={(e) => {
-                  if (!minutesEditable || !room) return;
-                  const breakMinutes = Number(e.target.value);
-                  const workMinutes = Number(draftWork ?? room.workMinutes);
-                  void patchRoom({ workMinutes, breakMinutes }).then((ok) => {
-                    if (ok) setDraftBreak(null);
-                  });
-                }}
+                onBlur={commitMinutesFromBlur}
               />
             </label>
           </div>

@@ -55,6 +55,14 @@ class SharedWorkBreakStep {
         )
     }
 
+    @Step("参加者 <name> に休憩フェーズと記憶した残り時間が復元されている")
+    fun 参加者に休憩フェーズと記憶した残り時間が復元されている(name: String) {
+        RoomPage(ParticipantSessions.page(name)).assertBreakPhaseWithRestoredRemainingTime(
+            ParticipantSessions.rememberedRemainingMmSs(),
+            ParticipantSessions.rememberedRemainingAtMs(),
+        )
+    }
+
     @Step("参加者 <name> が休憩を提案する")
     fun 参加者が休憩を提案する(name: String) {
         RoomPage(ParticipantSessions.page(name)).proposeBreak()

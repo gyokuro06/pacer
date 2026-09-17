@@ -21,7 +21,6 @@ class RoomPage(page: Page) : BasePage(page) {
 
     fun setWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
         workMinutesInput().fill(workMinutes)
-        workMinutesInput().blur()
         breakMinutesInput().fill(breakMinutes)
         breakMinutesInput().blur()
         PlaywrightAssertions.assertThat(workMinutesInput()).hasValue(workMinutes)
@@ -105,6 +104,23 @@ class RoomPage(page: Page) : BasePage(page) {
         toleranceSeconds: Long = 5,
     ) {
         PlaywrightAssertions.assertThat(phaseLabel("作業")).isVisible()
+        assertRestoredRemainingTime(rememberedMmSs, rememberedAtMs, toleranceSeconds)
+    }
+
+    fun assertBreakPhaseWithRestoredRemainingTime(
+        rememberedMmSs: String,
+        rememberedAtMs: Long,
+        toleranceSeconds: Long = 5,
+    ) {
+        PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
+        assertRestoredRemainingTime(rememberedMmSs, rememberedAtMs, toleranceSeconds)
+    }
+
+    private fun assertRestoredRemainingTime(
+        rememberedMmSs: String,
+        rememberedAtMs: Long,
+        toleranceSeconds: Long,
+    ) {
         val actualMmSs = readRemainingTime()
         val actualSeconds = parseMmSsToSeconds(actualMmSs)
         val rememberedSeconds = parseMmSsToSeconds(rememberedMmSs)

@@ -242,6 +242,21 @@ describe("session flow", () => {
     assert.equal(duringWork.phaseEndsAt, work.phaseEndsAt);
   });
 
+  it("updates minutes during break without changing phaseEndsAt", () => {
+    const waiting = joinRoomState(createRoomState(25, 5, alice, "ABCDEF"), bob)
+      .room;
+    const now = 1_000_000;
+    const work = startSessionState(waiting, now);
+    const onBreak = confirmProposalState(proposeState(work, "break"), now + 1000);
+    assert.equal(onBreak.phase, "break");
+
+    const duringBreak = updateRoomMinutesState(onBreak, 10, 3, now + 2000);
+    assert.equal(duringBreak.workMinutes, 10);
+    assert.equal(duringBreak.breakMinutes, 3);
+    assert.equal(duringBreak.phase, "break");
+    assert.equal(duringBreak.phaseEndsAt, onBreak.phaseEndsAt);
+  });
+
   it("starts work then confirms break proposal", () => {
     const waiting = joinRoomState(createRoomState(25, 5, alice, "ABCDEF"), bob)
       .room;
