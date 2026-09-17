@@ -59,10 +59,12 @@ object ParticipantSessions {
           window.__pacerChimePlays = [];
           const nativePlay = HTMLAudioElement.prototype.play;
           HTMLAudioElement.prototype.play = function (...args) {
-            window.__pacerChimePlays.push({
-              src: String(this.src || ''),
-              at: Date.now(),
-            });
+            if (!this.muted && this.volume > 0) {
+              window.__pacerChimePlays.push({
+                src: String(this.src || ''),
+                at: Date.now(),
+              });
+            }
             return nativePlay.apply(this, args).catch(() => undefined);
           };
         })();

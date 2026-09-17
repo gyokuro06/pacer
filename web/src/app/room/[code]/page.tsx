@@ -26,19 +26,32 @@ const TIMER_END_CHIME_URL = "/timer-end-chime.wav";
 
 type NotificationPermissionState = NotificationPermission | "unsupported";
 
+let timerEndChime: HTMLAudioElement | null = null;
+
 function participantStorageKey(code: string) {
   return `pacer:${code}:participantId`;
 }
 
+function getTimerEndChime(): HTMLAudioElement {
+  if (!timerEndChime) {
+    timerEndChime = new Audio(TIMER_END_CHIME_URL);
+    timerEndChime.preload = "auto";
+  }
+  return timerEndChime;
+}
+
 function unlockAudio() {
   try {
-    const AC =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AC) return;
-    const ctx = new AC();
-    void ctx.resume();
+    const audio = getTimerEndChime();
+    audio.load();
+    audio.muted = true;
+    audio.volume = 0;
+    const primed = audio.play();
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
+    audio.volume = 1;
+    void primed.catch(() => undefined);
   } catch {
     /* best-effort unlock via existing clicks */
   }
@@ -46,7 +59,10 @@ function unlockAudio() {
 
 function playTimerEndChime() {
   try {
-    const audio = new Audio(TIMER_END_CHIME_URL);
+    const audio = getTimerEndChime();
+    audio.muted = false;
+    audio.volume = 1;
+    audio.currentTime = 0;
     void audio.play().catch(() => undefined);
   } catch {
     /* autoplay / decode may fail; notification path is independent */
