@@ -300,9 +300,6 @@ export function updateRoomMinutesState(
   breakMinutes: number,
   now = Date.now(),
 ): Room {
-  if (room.phase !== "waiting") {
-    throw new Error("待機中のみ分数を変更できます");
-  }
   if (!Number.isFinite(workMinutes) || workMinutes <= 0) {
     throw new Error("作業時間が不正です");
   }

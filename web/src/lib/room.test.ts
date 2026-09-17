@@ -253,14 +253,33 @@ describe("session flow", () => {
     assert.throws(() => startSessionState(room), /開始条件/);
   });
 
-  it("updates minutes only while waiting", () => {
+  it("updates minutes without changing phaseEndsAt", () => {
     const waiting = createRoomState(60, 10, alice, "ABCDEF");
     const updated = updateRoomMinutesState(waiting, 25, 5);
     assert.equal(updated.workMinutes, 25);
     assert.equal(updated.breakMinutes, 5);
 
-    const work = startSessionState(updated, 1_000_000);
-    assert.throws(() => updateRoomMinutesState(work, 30, 5), /待機中のみ/);
+    const now = 1_000_000;
+    const work = startSessionState(updated, now);
+    const duringWork = updateRoomMinutesState(work, 30, 3, now + 1000);
+    assert.equal(duringWork.workMinutes, 30);
+    assert.equal(duringWork.breakMinutes, 3);
+    assert.equal(duringWork.phaseEndsAt, work.phaseEndsAt);
+  });
+
+  it("updates minutes during break without changing phaseEndsAt", () => {
+    const waiting = joinRoomState(createRoomState(25, 5, alice, "ABCDEF"), bob)
+      .room;
+    const now = 1_000_000;
+    const work = startSessionState(waiting, now);
+    const onBreak = confirmProposalState(proposeState(work, "break"), now + 1000);
+    assert.equal(onBreak.phase, "break");
+
+    const duringBreak = updateRoomMinutesState(onBreak, 10, 3, now + 2000);
+    assert.equal(duringBreak.workMinutes, 10);
+    assert.equal(duringBreak.breakMinutes, 3);
+    assert.equal(duringBreak.phase, "break");
+    assert.equal(duringBreak.phaseEndsAt, onBreak.phaseEndsAt);
   });
 
   it("starts work then confirms break proposal", () => {

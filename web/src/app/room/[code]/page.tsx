@@ -346,7 +346,7 @@ export default function RoomPage() {
     }
   }, [room, now, notificationPermission]);
 
-  const minutesEditable = room?.phase === "waiting" && isParticipant;
+  const minutesEditable = isParticipant;
   const nameValue = draftName ?? self?.displayName ?? "";
 
   if (!room) {

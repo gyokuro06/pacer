@@ -173,6 +173,23 @@ class RoomPage(page: Page) : BasePage(page) {
         toleranceSeconds: Long = 5,
     ) {
         PlaywrightAssertions.assertThat(phaseLabel("作業")).isVisible()
+        assertRestoredRemainingTime(rememberedMmSs, rememberedAtMs, toleranceSeconds)
+    }
+
+    fun assertBreakPhaseWithRestoredRemainingTime(
+        rememberedMmSs: String,
+        rememberedAtMs: Long,
+        toleranceSeconds: Long = 5,
+    ) {
+        PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
+        assertRestoredRemainingTime(rememberedMmSs, rememberedAtMs, toleranceSeconds)
+    }
+
+    private fun assertRestoredRemainingTime(
+        rememberedMmSs: String,
+        rememberedAtMs: Long,
+        toleranceSeconds: Long,
+    ) {
         val actualMmSs = readRemainingTime()
         val actualSeconds = parseMmSsToSeconds(actualMmSs)
         val rememberedSeconds = parseMmSsToSeconds(rememberedMmSs)
@@ -182,6 +199,18 @@ class RoomPage(page: Page) : BasePage(page) {
         require(delta <= toleranceSeconds) {
             "残り時間が復元されていません: actual=$actualMmSs " +
                 "remembered=$rememberedMmSs elapsed≈${"%.1f".format(elapsedSeconds)}s " +
+                "delta≈${"%.1f".format(delta)}s (tolerance=${toleranceSeconds}s)"
+        }
+    }
+
+    fun assertRemainingTimeApproximately(minutes: Int, toleranceSeconds: Long = 15) {
+        PlaywrightAssertions.assertThat(remainingTime()).isVisible()
+        val actualMmSs = readRemainingTime()
+        val actualSeconds = parseMmSsToSeconds(actualMmSs)
+        val expectedSeconds = minutes * 60.0
+        val delta = kotlin.math.abs(actualSeconds - expectedSeconds)
+        require(delta <= toleranceSeconds) {
+            "残り時間がおよそ ${minutes} 分ではありません: actual=$actualMmSs " +
                 "delta≈${"%.1f".format(delta)}s (tolerance=${toleranceSeconds}s)"
         }
     }
