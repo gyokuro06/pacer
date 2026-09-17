@@ -1,4 +1,5 @@
 import {
+  changeParticipantEmojiState,
   confirmProposalState,
   createRoomState,
   isRoomExpired,
@@ -101,6 +102,20 @@ export async function confirm(code: string): Promise<Room> {
     throw new Error("ルームが見つかりません");
   }
   const updated = confirmProposalState(existing);
+  await persist(updated);
+  return updated;
+}
+
+export async function changeParticipantEmoji(
+  code: string,
+  participantId: string,
+  emoji: string,
+): Promise<Room> {
+  const existing = await getRoom(code);
+  if (!existing) {
+    throw new Error("ルームが見つかりません");
+  }
+  const updated = changeParticipantEmojiState(existing, participantId, emoji);
   await persist(updated);
   return updated;
 }

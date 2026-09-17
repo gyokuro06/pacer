@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  changeParticipantEmojiState,
   confirmProposalState,
   createRoomState,
   formatRemainingMs,
@@ -58,6 +59,48 @@ describe("emoji auto-assign on create and join", () => {
     assert.notEqual(
       withBob.participants[0]?.emoji,
       withBob.participants[1]?.emoji,
+    );
+  });
+});
+
+describe("changeParticipantEmojiState", () => {
+  it("changes own emoji to an unused one", () => {
+    const room = joinRoomState(
+      createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF"),
+      { id: "b", displayName: "Bob" },
+    ).room;
+    const next = PARTICIPANT_EMOJIS[2];
+    const updated = changeParticipantEmojiState(room, "a", next);
+    assert.equal(updated.participants[0]?.emoji, next);
+    assert.equal(updated.participants[1]?.emoji, PARTICIPANT_EMOJIS[1]);
+  });
+
+  it("allows keeping the current emoji", () => {
+    const room = createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF");
+    const updated = changeParticipantEmojiState(
+      room,
+      "a",
+      PARTICIPANT_EMOJIS[0],
+    );
+    assert.equal(updated.participants[0]?.emoji, PARTICIPANT_EMOJIS[0]);
+  });
+
+  it("rejects emoji taken by another participant", () => {
+    const room = joinRoomState(
+      createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF"),
+      { id: "b", displayName: "Bob" },
+    ).room;
+    assert.throws(
+      () => changeParticipantEmojiState(room, "a", PARTICIPANT_EMOJIS[1]),
+      /他の参加者が使用中/,
+    );
+  });
+
+  it("rejects emoji outside the pool", () => {
+    const room = createRoomState(25, 5, { id: "a", displayName: "Alice" }, "ABCDEF");
+    assert.throws(
+      () => changeParticipantEmojiState(room, "a", "🍕"),
+      /選べません/,
     );
   });
 });

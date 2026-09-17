@@ -41,6 +41,40 @@ export function pickUnusedEmoji(usedEmojis: readonly string[]): string {
   return next;
 }
 
+export function isParticipantEmoji(
+  value: string,
+): value is (typeof PARTICIPANT_EMOJIS)[number] {
+  return (PARTICIPANT_EMOJIS as readonly string[]).includes(value);
+}
+
+export function changeParticipantEmojiState(
+  room: Room,
+  participantId: string,
+  emoji: string,
+  now = Date.now(),
+): Room {
+  if (!isParticipantEmoji(emoji)) {
+    throw new Error("その絵文字は選べません");
+  }
+  const self = room.participants.find((p) => p.id === participantId);
+  if (!self) {
+    throw new Error("参加者が見つかりません");
+  }
+  const takenByOther = room.participants.some(
+    (p) => p.id !== participantId && p.emoji === emoji,
+  );
+  if (takenByOther) {
+    throw new Error("その絵文字は他の参加者が使用中です");
+  }
+  return {
+    ...room,
+    participants: room.participants.map((p) =>
+      p.id === participantId ? { ...p, emoji } : p,
+    ),
+    lastActivityAt: now,
+  };
+}
+
 function withAssignedEmoji(
   participant: ParticipantInput,
   usedEmojis: readonly string[],

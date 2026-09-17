@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import {
   canStart,
   formatRemainingMs,
+  PARTICIPANT_EMOJIS,
   phaseLabel,
   remainingMs,
   type Room,
@@ -13,12 +14,22 @@ import styles from "./page.module.css";
 
 const POLL_MS = 500;
 
+function readSelfParticipantId(code: string): string | null {
+  try {
+    return sessionStorage.getItem(`pacer:${code}:participantId`);
+  } catch {
+    return null;
+  }
+}
+
 export default function RoomPage() {
   const params = useParams<{ code: string }>();
   const code = String(params.code ?? "").toUpperCase();
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [selfId, setSelfId] = useState<string | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
@@ -29,6 +40,10 @@ export default function RoomPage() {
       throw new Error(data.error ?? "ルーム取得に失敗しました");
     }
     setRoom(data.room);
+  }, [code]);
+
+  useEffect(() => {
+    setSelfId(readSelfParticipantId(code));
   }, [code]);
 
   useEffect(() => {
@@ -53,6 +68,15 @@ export default function RoomPage() {
     };
   }, [refresh]);
 
+  useEffect(() => {
+    if (!emojiPickerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEmojiPickerOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [emojiPickerOpen]);
+
   async function postAction(path: string, body?: unknown) {
     setError(null);
     const response = await fetch(path, {
@@ -63,9 +87,19 @@ export default function RoomPage() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "操作に失敗しました");
-      return;
+      return false;
     }
     setRoom(data.room);
+    return true;
+  }
+
+  async function selectEmoji(emoji: string) {
+    if (!selfId) return;
+    const ok = await postAction(`/api/rooms/${encodeURIComponent(code)}/emoji`, {
+      participantId: selfId,
+      emoji,
+    });
+    if (ok) setEmojiPickerOpen(false);
   }
 
   if (!room) {
@@ -80,6 +114,11 @@ export default function RoomPage() {
 
   const remaining = remainingMs(room, now);
   const showTimer = room.phase !== "waiting" && remaining != null;
+  const takenByOthers = new Set(
+    room.participants
+      .filter((p) => p.id !== selfId)
+      .map((p) => p.emoji),
+  );
 
   return (
     <div className={styles.page}>
@@ -155,10 +194,43 @@ export default function RoomPage() {
         <ul aria-label="参加者" className={styles.participants}>
           {room.participants.map((participant) => (
             <li key={participant.id} className={styles.participant}>
-              {participant.emoji} {participant.displayName}
+              <span>
+                {participant.emoji} {participant.displayName}
+              </span>
+              {participant.id === selfId ? (
+                <button
+                  type="button"
+                  className={styles.changeEmoji}
+                  onClick={() => setEmojiPickerOpen(true)}
+                >
+                  絵文字を変更
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
+
+        {emojiPickerOpen ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="絵文字を選ぶ"
+            className={styles.emojiDialog}
+          >
+            <div className={styles.emojiOptions}>
+              {PARTICIPANT_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  disabled={takenByOthers.has(emoji)}
+                  onClick={() => void selectEmoji(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {error ? <p className={styles.error}>{error}</p> : null}
       </main>
