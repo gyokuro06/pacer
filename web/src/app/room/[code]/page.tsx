@@ -194,26 +194,38 @@ export default function RoomPage() {
         <ul aria-label="参加者" className={styles.participants}>
           {room.participants.map((participant) => {
             const isSelf = participant.id === selfId;
-            const openProfile = () => {
-              if (isSelf) setProfileOpen(true);
-            };
             return (
               <li key={participant.id} className={styles.participant}>
-                <button
-                  type="button"
-                  className={styles.avatar}
-                  aria-label={`${participant.displayName}のアバター`}
-                  onClick={openProfile}
-                >
-                  {participant.emoji}
-                </button>
-                <button
-                  type="button"
-                  className={styles.displayName}
-                  onClick={openProfile}
-                >
-                  {participant.displayName}
-                </button>
+                {isSelf ? (
+                  <button
+                    type="button"
+                    className={styles.avatar}
+                    aria-label={`${participant.displayName}のアバター`}
+                    onClick={() => setProfileOpen(true)}
+                  >
+                    {participant.emoji}
+                  </button>
+                ) : (
+                  <span
+                    className={styles.avatar}
+                    aria-label={`${participant.displayName}のアバター`}
+                  >
+                    {participant.emoji}
+                  </span>
+                )}
+                {isSelf ? (
+                  <button
+                    type="button"
+                    className={styles.displayName}
+                    onClick={() => setProfileOpen(true)}
+                  >
+                    {participant.displayName}
+                  </button>
+                ) : (
+                  <span className={styles.displayName}>
+                    {participant.displayName}
+                  </span>
+                )}
                 {isSelf ? (
                   <span className={styles.youLabel}>You</span>
                 ) : null}
@@ -223,23 +235,25 @@ export default function RoomPage() {
         </ul>
 
         {profileOpen ? (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="プロフィール"
-            className={styles.profileDialog}
-          >
-            <div className={styles.emojiOptions}>
-              {PARTICIPANT_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  disabled={takenByOthers.has(emoji)}
-                  onClick={() => void selectEmoji(emoji)}
-                >
-                  {emoji}
-                </button>
-              ))}
+          <div className={styles.profileBackdrop}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="プロフィール"
+              className={styles.profileDialog}
+            >
+              <div className={styles.emojiOptions}>
+                {PARTICIPANT_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    disabled={takenByOthers.has(emoji)}
+                    onClick={() => void selectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : null}

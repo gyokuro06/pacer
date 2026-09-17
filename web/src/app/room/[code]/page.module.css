@@ -96,13 +96,16 @@
   border-radius: 50%;
   background: color-mix(in srgb, var(--background) 70%, var(--accent-soft));
   color: var(--foreground);
-  cursor: pointer;
   display: grid;
   place-items: center;
   line-height: 1;
 }
 
-.avatar:focus-visible {
+button.avatar {
+  cursor: pointer;
+}
+
+button.avatar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -115,10 +118,13 @@
   border: none;
   background: transparent;
   color: var(--foreground);
+}
+
+button.displayName {
   cursor: pointer;
 }
 
-.displayName:focus-visible {
+button.displayName:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -128,8 +134,18 @@
   color: color-mix(in srgb, var(--foreground) 65%, transparent);
 }
 
+.profileBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--foreground) 32%, transparent);
+}
+
 .profileDialog {
-  width: 100%;
+  width: min(100%, 22rem);
   padding: 1rem;
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--background) 88%, var(--accent-soft));

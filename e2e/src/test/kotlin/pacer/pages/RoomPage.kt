@@ -80,11 +80,19 @@ class RoomPage(page: Page) : BasePage(page) {
         require(emoji.isNotEmpty()) {
             "表示名 \"$displayName\" の参加者に絵文字がありません"
         }
+        assertCircularAvatar(participantAvatar(displayName), displayName)
     }
 
     fun assertParticipantHasYou(displayName: String) {
         PlaywrightAssertions.assertThat(participantYouLabel(displayName)).isVisible()
         PlaywrightAssertions.assertThat(participantDisplayName(displayName)).isVisible()
+        val youCount =
+            participants()
+                .getByText("You", Locator.GetByTextOptions().setExact(true))
+                .count()
+        require(youCount == 1) {
+            "You は自分だけに表示されるべきです: count=$youCount (expected self=\"$displayName\")"
+        }
     }
 
     fun assertParticipantEmojisDistinct(displayNameA: String, displayNameB: String) {
@@ -130,15 +138,20 @@ class RoomPage(page: Page) : BasePage(page) {
 
     fun assertProfileDialogVisible() {
         PlaywrightAssertions.assertThat(profileDialog()).isVisible()
+        assertDialogFullyInViewport(profileDialog())
     }
 
     fun assertOtherAvatarDoesNotOpenProfile(otherDisplayName: String) {
-        participantAvatar(otherDisplayName).click()
+        val avatar = participantAvatar(otherDisplayName)
+        assertNonInteractiveParticipantControl(avatar, "アバター", otherDisplayName)
+        avatar.click()
         PlaywrightAssertions.assertThat(profileDialog()).isHidden()
     }
 
     fun assertOtherNameDoesNotOpenProfile(otherDisplayName: String) {
-        participantDisplayName(otherDisplayName).click()
+        val name = participantDisplayName(otherDisplayName)
+        assertNonInteractiveParticipantControl(name, "表示名", otherDisplayName)
+        name.click()
         PlaywrightAssertions.assertThat(profileDialog()).isHidden()
     }
 
@@ -185,10 +198,8 @@ class RoomPage(page: Page) : BasePage(page) {
             .associate { item ->
                 val displayName =
                     item
-                        .getByRole(AriaRole.BUTTON)
-                        .all()
-                        .map { it.getAttribute("aria-label").orEmpty() }
-                        .firstOrNull { it.endsWith("のアバター") }
+                        .locator("[aria-label$='のアバター']")
+                        .getAttribute("aria-label")
                         ?.removeSuffix("のアバター")
                         ?: error("参加者の表示名が読めません: \"${item.innerText().trim()}\"")
                 displayName to readParticipantEmoji(displayName)
@@ -217,26 +228,84 @@ class RoomPage(page: Page) : BasePage(page) {
             .getByRole(AriaRole.LISTITEM)
             .filter(
                 Locator.FilterOptions().setHas(
-                    playwrightPage.getByRole(
-                        AriaRole.BUTTON,
-                        Page.GetByRoleOptions().setName("${displayName}のアバター"),
-                    ),
+                    playwrightPage.getByLabel("${displayName}のアバター"),
                 ),
             )
 
     private fun participantAvatar(displayName: String): Locator =
-        participantItem(displayName)
-            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("${displayName}のアバター"))
+        participantItem(displayName).getByLabel("${displayName}のアバター")
 
     private fun participantDisplayName(displayName: String): Locator =
         participantItem(displayName)
-            .getByRole(
-                AriaRole.BUTTON,
-                Locator.GetByRoleOptions().setName(displayName).setExact(true),
-            )
+            .getByText(displayName, Locator.GetByTextOptions().setExact(true))
 
     private fun participantYouLabel(displayName: String): Locator =
         participantItem(displayName).getByText("You", Locator.GetByTextOptions().setExact(true))
+
+    private fun assertCircularAvatar(avatar: Locator, displayName: String) {
+        @Suppress("UNCHECKED_CAST")
+        val metrics =
+            avatar.evaluate(
+                """
+                el => {
+                  const box = el.getBoundingClientRect();
+                  return {
+                    width: box.width,
+                    height: box.height,
+                    borderRadius: getComputedStyle(el).borderRadius,
+                  };
+                }
+                """.trimIndent(),
+            ) as Map<String, Any?>
+        val width = (metrics["width"] as Number).toDouble()
+        val height = (metrics["height"] as Number).toDouble()
+        require(kotlin.math.abs(width - height) < 1.0) {
+            "表示名 \"$displayName\" のアバターが円形ではありません: ${width}x$height"
+        }
+        val borderRadius = metrics["borderRadius"].toString()
+        val circular =
+            borderRadius == "50%" ||
+                borderRadius.split(Regex("\\s+")).all { token ->
+                    val radiusPx = token.removeSuffix("px").toDoubleOrNull()
+                    radiusPx != null && kotlin.math.abs(radiusPx - width / 2.0) < 1.0
+                }
+        require(circular) {
+            "表示名 \"$displayName\" のアバターが円形ではありません: borderRadius=$borderRadius size=$width"
+        }
+    }
+
+    private fun assertDialogFullyInViewport(dialog: Locator) {
+        val box =
+            dialog.boundingBox()
+                ?: error("プロフィールダイアログの位置が取得できません")
+        val viewport =
+            playwrightPage.viewportSize()
+                ?: error("viewport サイズが取得できません")
+        require(box.x >= 0 && box.y >= 0) {
+            "プロフィールダイアログが viewport 外です: x=${box.x} y=${box.y}"
+        }
+        require(box.x + box.width <= viewport.width + 1) {
+            "プロフィールダイアログが viewport 右外です: right=${box.x + box.width} width=${viewport.width}"
+        }
+        require(box.y + box.height <= viewport.height + 1) {
+            "プロフィールダイアログが viewport 下外です: bottom=${box.y + box.height} height=${viewport.height}"
+        }
+    }
+
+    private fun assertNonInteractiveParticipantControl(
+        control: Locator,
+        kind: String,
+        displayName: String,
+    ) {
+        val tagName = control.evaluate("el => el.tagName") as String
+        require(tagName != "BUTTON") {
+            "他参加者 \"$displayName\" の$kind が button のままです: tag=$tagName"
+        }
+        val cursor = control.evaluate("el => getComputedStyle(el).cursor") as String
+        require(cursor != "pointer") {
+            "他参加者 \"$displayName\" の$kind が pointer カーソルです: cursor=$cursor"
+        }
+    }
 
     private fun roomCode(): Locator =
         main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
