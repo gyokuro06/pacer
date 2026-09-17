@@ -23,6 +23,7 @@ import styles from "./page.module.css";
 
 const POLL_MS = 500;
 const MINUTE_PRESETS = [60, 30, 15, 10] as const;
+const PARTICIPANT_SLOT_LETTERS = ["A", "B", "C", "D"] as const;
 
 function isMinutePreset(value: number): boolean {
   return (MINUTE_PRESETS as readonly number[]).includes(value);
@@ -96,9 +97,9 @@ export default function RoomPage() {
   const [now, setNow] = useState(() => Date.now());
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [joinName, setJoinName] = useState("");
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [copyDone, setCopyDone] = useState(false);
-  const [draftName, setDraftName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState("");
   const [notificationPermission, setNotificationPermission] =
@@ -206,7 +207,6 @@ export default function RoomPage() {
       },
     );
     if (ok) {
-      setDraftName(null);
       setProfileOpen(false);
     }
   }
@@ -245,6 +245,8 @@ export default function RoomPage() {
     storeParticipant(data.room.code, data.participantId);
     setParticipantId(data.participantId);
     setRoom(data.room);
+    setJoinDialogOpen(false);
+    setJoinName("");
   }
 
   async function copyShareUrl() {
@@ -265,10 +267,14 @@ export default function RoomPage() {
     return room.participants.some((p) => p.id === participantId);
   }, [room, participantId]);
 
-  const self = useMemo(() => {
-    if (!room || !participantId) return null;
-    return room.participants.find((p) => p.id === participantId) ?? null;
-  }, [room, participantId]);
+  useEffect(() => {
+    if (!room) return;
+    if (!isParticipant) {
+      setJoinDialogOpen(true);
+    } else {
+      setJoinDialogOpen(false);
+    }
+  }, [room, isParticipant]);
 
   const readNotificationPermission = useCallback((): NotificationPermissionState => {
     if (typeof Notification === "undefined") return "unsupported";
@@ -347,7 +353,6 @@ export default function RoomPage() {
   }, [room, now, notificationPermission]);
 
   const minutesEditable = isParticipant;
-  const nameValue = draftName ?? self?.displayName ?? "";
 
   if (!room) {
     return (
@@ -368,171 +373,75 @@ export default function RoomPage() {
       .filter((p) => p.id !== participantId)
       .map((p) => p.emoji),
   );
+  const showJoinDialog = !isParticipant && joinDialogOpen;
 
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <h1 className={styles.brand}>pacer</h1>
-        <div role="status" aria-label="ルームコード" className={styles.code}>
-          {room.code}
-        </div>
-
-        <div className={styles.share}>
-          <div role="status" aria-label="共有URL" className={styles.shareUrl}>
-            {shareUrl}
-          </div>
-          <button
-            type="button"
-            className={styles.copyButton}
-            aria-label="共有URLをコピー"
-            onClick={() => void copyShareUrl()}
-          >
-            <svg
-              aria-hidden="true"
-              width="1.25em"
-              height="1.25em"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <div className={styles.top}>
+          <h1 className={styles.brand}>pacer</h1>
+          <div className={styles.share}>
+            <div role="status" aria-label="共有URL" className={styles.shareUrl}>
+              {shareUrl}
+            </div>
+            <button
+              type="button"
+              className={styles.copyButton}
+              aria-label="共有URLをコピー"
+              onClick={() => void copyShareUrl()}
             >
-              <rect x="9" y="9" width="13" height="13" rx="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-          </button>
-          {copyDone ? (
-            <span className={styles.copyHint}>コピーしました</span>
-          ) : null}
+              <svg
+                aria-hidden="true"
+                width="1.25em"
+                height="1.25em"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+            {copyDone ? (
+              <span className={styles.copyHint}>コピーしました</span>
+            ) : null}
+          </div>
         </div>
 
-        {isParticipant && self ? (
-          <label className={styles.field}>
-            <span>表示名</span>
-            <input
-              type="text"
-              aria-label="表示名"
-              value={nameValue}
-              onChange={(e) => setDraftName(e.target.value)}
-              onBlur={(e) => {
-                const displayName = e.target.value;
-                setDraftName(null);
-                void patchRoom({ displayName });
-              }}
-            />
-          </label>
-        ) : null}
+        <section
+          role="region"
+          aria-label="タイマー"
+          className={styles.timerRegion}
+        >
+          {room.phase !== "waiting" ? (
+            <div role="status" aria-label="フェーズ" className={styles.phase}>
+              {phaseLabel(room.phase)}
+            </div>
+          ) : null}
 
-        {!isParticipant ? (
-          <form className={styles.join} onSubmit={onJoin}>
-            <label className={styles.field}>
-              <span>表示名</span>
-              <input
-                type="text"
-                aria-label="参加用の表示名"
-                value={joinName}
-                onChange={(e) => setJoinName(e.target.value)}
-                required
-              />
-            </label>
-            <button type="submit">参加</button>
-          </form>
-        ) : null}
+          {timerEndedTitle ? (
+            <p
+              role="status"
+              aria-live="assertive"
+              className={styles.timerEndNotice}
+            >
+              {timerEndedTitle}
+            </p>
+          ) : null}
 
-        {room.phase !== "waiting" ? (
-          <div role="status" aria-label="フェーズ" className={styles.phase}>
-            {phaseLabel(room.phase)}
-          </div>
-        ) : null}
-
-        {timerEndedTitle ? (
-          <p role="status" aria-live="assertive" className={styles.timerEndNotice}>
-            {timerEndedTitle}
-          </p>
-        ) : null}
-
-        <div className={styles.timerRow}>
           {showTimer ? (
             <div role="timer" aria-label="残り時間" className={styles.timer}>
               {formatRemainingMs(remaining)}
             </div>
           ) : (
-            <div className={styles.timerPlaceholder} aria-hidden="true" />
+            <div className={styles.timerPlaceholder} aria-hidden="true">
+              --:--
+            </div>
           )}
-          <div className={styles.minutes}>
-            <div className={styles.field}>
-              <span>作業（分）</span>
-              {!isMinutePreset(room.workMinutes) ? (
-                <div
-                  role="status"
-                  aria-label="作業の現在（分）"
-                  className={styles.currentMinutes}
-                >
-                  {room.workMinutes}
-                </div>
-              ) : null}
-              <div
-                role="radiogroup"
-                aria-label="作業（分）"
-                className={styles.presetGroup}
-              >
-                {MINUTE_PRESETS.map((minutes) => (
-                  <button
-                    key={`work-${minutes}`}
-                    type="button"
-                    role="radio"
-                    aria-checked={room.workMinutes === minutes}
-                    aria-label={String(minutes)}
-                    className={styles.presetOption}
-                    disabled={!minutesEditable}
-                    onClick={() => {
-                      if (!minutesEditable) return;
-                      void patchRoom({ workMinutes: minutes });
-                    }}
-                  >
-                    {minutes}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={styles.field}>
-              <span>休憩（分）</span>
-              {!isMinutePreset(room.breakMinutes) ? (
-                <div
-                  role="status"
-                  aria-label="休憩の現在（分）"
-                  className={styles.currentMinutes}
-                >
-                  {room.breakMinutes}
-                </div>
-              ) : null}
-              <div
-                role="radiogroup"
-                aria-label="休憩（分）"
-                className={styles.presetGroup}
-              >
-                {MINUTE_PRESETS.map((minutes) => (
-                  <button
-                    key={`break-${minutes}`}
-                    type="button"
-                    role="radio"
-                    aria-checked={room.breakMinutes === minutes}
-                    aria-label={String(minutes)}
-                    className={styles.presetOption}
-                    disabled={!minutesEditable}
-                    onClick={() => {
-                      if (!minutesEditable) return;
-                      void patchRoom({ breakMinutes: minutes });
-                    }}
-                  >
-                    {minutes}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
 
         <div className={styles.actions}>
           {room.phase === "waiting" && isParticipant ? (
@@ -607,48 +516,170 @@ export default function RoomPage() {
               提案を確定
             </button>
           ) : null}
+
+          {!isParticipant && !showJoinDialog ? (
+            <button
+              type="button"
+              onClick={() => setJoinDialogOpen(true)}
+            >
+              参加する
+            </button>
+          ) : null}
+        </div>
+
+        <div className={styles.minutes}>
+          <div className={styles.field}>
+            <span>作業（分）</span>
+            {!isMinutePreset(room.workMinutes) ? (
+              <div
+                role="status"
+                aria-label="作業の現在（分）"
+                className={styles.currentMinutes}
+              >
+                {room.workMinutes}
+              </div>
+            ) : null}
+            <div
+              role="radiogroup"
+              aria-label="作業（分）"
+              className={styles.presetGroup}
+            >
+              {MINUTE_PRESETS.map((minutes) => (
+                <button
+                  key={`work-${minutes}`}
+                  type="button"
+                  role="radio"
+                  aria-checked={room.workMinutes === minutes}
+                  aria-label={String(minutes)}
+                  className={styles.presetOption}
+                  disabled={!minutesEditable}
+                  onClick={() => {
+                    if (!minutesEditable) return;
+                    void patchRoom({ workMinutes: minutes });
+                  }}
+                >
+                  {minutes}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.field}>
+            <span>休憩（分）</span>
+            {!isMinutePreset(room.breakMinutes) ? (
+              <div
+                role="status"
+                aria-label="休憩の現在（分）"
+                className={styles.currentMinutes}
+              >
+                {room.breakMinutes}
+              </div>
+            ) : null}
+            <div
+              role="radiogroup"
+              aria-label="休憩（分）"
+              className={styles.presetGroup}
+            >
+              {MINUTE_PRESETS.map((minutes) => (
+                <button
+                  key={`break-${minutes}`}
+                  type="button"
+                  role="radio"
+                  aria-checked={room.breakMinutes === minutes}
+                  aria-label={String(minutes)}
+                  className={styles.presetOption}
+                  disabled={!minutesEditable}
+                  onClick={() => {
+                    if (!minutesEditable) return;
+                    void patchRoom({ breakMinutes: minutes });
+                  }}
+                >
+                  {minutes}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <ul aria-label="参加者" className={styles.participants}>
-          {room.participants.map((participant) => {
-            const isSelf = participant.id === participantId;
+          {PARTICIPANT_SLOT_LETTERS.map((letter, index) => {
+            const participant = room.participants[index] ?? null;
+            const isSelf = participant != null && participant.id === participantId;
             return (
-              <li key={participant.id} className={styles.participant}>
-                {isSelf ? (
-                  <button
-                    type="button"
-                    className={styles.avatar}
-                    aria-label={`${participant.displayName}のアバター`}
-                    onClick={() => openProfile(participant.displayName)}
-                  >
-                    {participant.emoji}
-                  </button>
+              <li
+                key={letter}
+                aria-label={`参加者枠 ${letter}`}
+                className={styles.participant}
+              >
+                {participant ? (
+                  <>
+                    {isSelf ? (
+                      <button
+                        type="button"
+                        className={styles.avatar}
+                        aria-label={`${participant.displayName}のアバター`}
+                        onClick={() => openProfile(participant.displayName)}
+                      >
+                        {participant.emoji}
+                      </button>
+                    ) : (
+                      <span
+                        className={styles.avatar}
+                        aria-label={`${participant.displayName}のアバター`}
+                      >
+                        {participant.emoji}
+                      </span>
+                    )}
+                    {isSelf ? (
+                      <button
+                        type="button"
+                        className={styles.displayName}
+                        onClick={() => openProfile(participant.displayName)}
+                      >
+                        {participant.displayName}
+                      </button>
+                    ) : (
+                      <span className={styles.displayName}>
+                        {participant.displayName}
+                      </span>
+                    )}
+                    {isSelf ? (
+                      <span className={styles.youLabel}>You</span>
+                    ) : null}
+                  </>
                 ) : (
-                  <span
-                    className={styles.avatar}
-                    aria-label={`${participant.displayName}のアバター`}
-                  >
-                    {participant.emoji}
-                  </span>
+                  <span className={styles.slotLetter}>{letter}</span>
                 )}
-                {isSelf ? (
-                  <button
-                    type="button"
-                    className={styles.displayName}
-                    onClick={() => openProfile(participant.displayName)}
-                  >
-                    {participant.displayName}
-                  </button>
-                ) : (
-                  <span className={styles.displayName}>
-                    {participant.displayName}
-                  </span>
-                )}
-                {isSelf ? <span className={styles.youLabel}>You</span> : null}
               </li>
             );
           })}
         </ul>
+
+        {showJoinDialog ? (
+          <div className={styles.profileBackdrop}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="参加"
+              className={styles.profileDialog}
+            >
+              <form onSubmit={onJoin}>
+                <label className={styles.profileField}>
+                  <span>表示名</span>
+                  <input
+                    type="text"
+                    aria-label="参加用の表示名"
+                    value={joinName}
+                    onChange={(e) => setJoinName(e.target.value)}
+                    required
+                  />
+                </label>
+                <button type="submit" className={styles.profileSave}>
+                  参加
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : null}
 
         {profileOpen ? (
           <div className={styles.profileBackdrop}>

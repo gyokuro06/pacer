@@ -91,20 +91,22 @@ object LayoutContract {
         }
     }
 
-    fun assertRoomCodeFluidTypography(page: Page) {
-        val roomCode =
+    fun assertRoomTimerFluidTypography(page: Page) {
+        val timer =
             page.getByRole(AriaRole.MAIN)
-                .getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
+                .getByRole(AriaRole.REGION, Locator.GetByRoleOptions().setName("タイマー"))
+                .locator("[aria-hidden=\"true\"], [role=\"timer\"]")
+                .first()
         val fontSize =
             px(
-                roomCode.evaluate(
+                timer.evaluate(
                     """
                     el => parseFloat(getComputedStyle(el).fontSize)
                     """.trimIndent(),
                 ),
             )
         check(fontSize >= MIN_ROOM_CODE_FONT_PX) {
-            "ルームコード表示の字体が小さすぎます: fontSize=${fontSize}px (min=${MIN_ROOM_CODE_FONT_PX}px)"
+            "タイマー表示の字体が小さすぎます: fontSize=${fontSize}px (min=${MIN_ROOM_CODE_FONT_PX}px)"
         }
     }
 }

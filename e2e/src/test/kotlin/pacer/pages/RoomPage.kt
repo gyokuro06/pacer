@@ -76,13 +76,11 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun joinViaJoinDialog(displayName: String) {
+        PlaywrightAssertions.assertThat(shareUrl()).isVisible()
         val dialog = joinDialog()
         if (dialog.count() == 0) {
-            val openButton = openJoinDialogButton()
-            require(openButton.count() > 0) {
-                "参加ダイアログ（role=dialog name=参加）も「参加する」ボタンもなく、ダイアログ参加できません"
-            }
-            openButton.click()
+            PlaywrightAssertions.assertThat(openJoinDialogButton()).isVisible()
+            openJoinDialogButton().click()
         }
         PlaywrightAssertions.assertThat(dialog).isVisible()
         dialog
@@ -95,7 +93,7 @@ class RoomPage(page: Page) : BasePage(page) {
     fun openOwnProfileViaParticipantSlot() {
         val displayName = readOwnDisplayNameFromSlot()
         ownParticipantSlot()
-            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(displayName))
+            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(displayName).setExact(true))
             .click()
         assertProfileDialogVisible()
     }
@@ -176,14 +174,17 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun readOwnDisplayNameFromSlot(): String {
         PlaywrightAssertions.assertThat(ownParticipantSlot()).isVisible()
-        val text = ownParticipantSlot().innerText().trim()
-        val displayName =
-            text
-                .lines()
-                .map { it.trim() }
-                .firstOrNull { it.isNotEmpty() && it != "You" && it !in PARTICIPANT_SLOT_LETTERS }
-                ?: error("参加者枠から自分の表示名を読めません: \"$text\"")
-        return displayName
+        val label =
+            ownParticipantSlot()
+                .locator("[aria-label$='のアバター']")
+                .getAttribute("aria-label")
+                ?.removeSuffix("のアバター")
+                ?.trim()
+                .orEmpty()
+        require(label.isNotEmpty()) {
+            "参加者枠から自分の表示名を読めません"
+        }
+        return label
     }
 
     private fun joinDialog(): Locator =
@@ -193,9 +194,11 @@ class RoomPage(page: Page) : BasePage(page) {
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加する"))
 
     fun setDisplayName(displayName: String) {
-        PlaywrightAssertions.assertThat(displayNameInput()).isVisible()
-        displayNameInput().fill(displayName)
-        displayNameInput().blur()
+        openOwnProfileViaParticipantSlot()
+        profileDisplayNameInput().fill(displayName)
+        profileSaveButton().click()
+        PlaywrightAssertions.assertThat(profileDialog()).isHidden()
+        assertDisplayNameInParticipantSlot(displayName)
     }
 
     fun setWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
@@ -205,10 +208,7 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun joinWithDisplayName(displayName: String) {
-        PlaywrightAssertions.assertThat(joinButton()).isVisible()
-        joinDisplayNameInput().fill(displayName)
-        joinButton().click()
-        PlaywrightAssertions.assertThat(joinButton()).hasCount(0)
+        joinViaJoinDialog(displayName)
     }
 
     fun assertWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
@@ -286,12 +286,12 @@ class RoomPage(page: Page) : BasePage(page) {
         }
         playwrightPage.reload()
         assertOnRoomPage()
-        PlaywrightAssertions.assertThat(roomCode()).isVisible()
+        PlaywrightAssertions.assertThat(shareUrl()).isVisible()
     }
 
     fun assertAutoDisplayNameVisible() {
-        PlaywrightAssertions.assertThat(displayNameInput()).isVisible()
-        val name = displayNameInput().inputValue().trim()
+        assertParticipantSlotsAtoDVisible()
+        val name = readOwnDisplayNameFromSlot()
         require(name.isNotEmpty()) { "表示名が自動で付いていません" }
         require(AUTO_DISPLAY_NAMES.contains(name)) {
             "表示名が候補一覧にありません: $name"
@@ -323,10 +323,7 @@ class RoomPage(page: Page) : BasePage(page) {
         }
     }
 
-    fun readRoomCode(): String {
-        PlaywrightAssertions.assertThat(roomCode()).isVisible()
-        return roomCode().innerText().trim()
-    }
+    fun readRoomCode(): String = readRoomCodeFromUrl()
 
     fun startSession() {
         startButton().click()
@@ -638,15 +635,16 @@ class RoomPage(page: Page) : BasePage(page) {
         return participants()
             .getByRole(AriaRole.LISTITEM)
             .all()
-            .associate { item ->
+            .mapNotNull { item ->
+                val avatar = item.locator("[aria-label$='のアバター']")
+                if (avatar.count() == 0) return@mapNotNull null
                 val displayName =
-                    item
-                        .locator("[aria-label$='のアバター']")
-                        .getAttribute("aria-label")
+                    avatar.getAttribute("aria-label")
                         ?.removeSuffix("のアバター")
                         ?: error("参加者の表示名が読めません: \"${item.innerText().trim()}\"")
                 displayName to readParticipantEmoji(displayName)
             }
+            .toMap()
     }
 
     private fun enabledEmojiOptions(): List<String> =
@@ -761,9 +759,6 @@ class RoomPage(page: Page) : BasePage(page) {
         }
     }
 
-    private fun roomCode(): Locator =
-        main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
-
     private fun shareUrl(): Locator =
         main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("共有URL"))
 
@@ -807,15 +802,6 @@ class RoomPage(page: Page) : BasePage(page) {
             ).hasAttribute("aria-checked", "false")
         }
     }
-
-    private fun displayNameInput(): Locator =
-        main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("表示名"))
-
-    private fun joinDisplayNameInput(): Locator =
-        main.getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("参加用の表示名"))
-
-    private fun joinButton(): Locator =
-        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加"))
 
     private fun startButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("スタート"))

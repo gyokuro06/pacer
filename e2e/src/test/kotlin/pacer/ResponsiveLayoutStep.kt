@@ -34,9 +34,9 @@ class ResponsiveLayoutStep {
         LayoutContract.assertMainColumnWideEnough(ParticipantSessions.page(name))
     }
 
-    @Step("参加者 <name> のルームコード表示が読みやすい流体サイズである")
-    fun 参加者のルームコード表示が読みやすい流体サイズである(name: String) {
-        LayoutContract.assertRoomCodeFluidTypography(ParticipantSessions.page(name))
+    @Step("参加者 <name> のタイマー表示が読みやすい流体サイズである")
+    fun 参加者のタイマー表示が読みやすい流体サイズである(name: String) {
+        LayoutContract.assertRoomTimerFluidTypography(ParticipantSessions.page(name))
     }
 
     @Step("参加者 <name> のルーム操作ボタンがタッチしやすいサイズである")
