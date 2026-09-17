@@ -72,6 +72,40 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
     }
 
+    fun assertParticipantVisibleWithEmoji(displayName: String) {
+        PlaywrightAssertions.assertThat(participantItem(displayName)).isVisible()
+        val emoji = readParticipantEmoji(displayName)
+        require(emoji.isNotEmpty()) {
+            "表示名 \"$displayName\" の参加者に絵文字がありません"
+        }
+    }
+
+    fun assertParticipantEmojisDistinct(displayNameA: String, displayNameB: String) {
+        val emojiA = readParticipantEmoji(displayNameA)
+        val emojiB = readParticipantEmoji(displayNameB)
+        require(emojiA != emojiB) {
+            "絵文字が重複しています: \"$displayNameA\"=$emojiA \"$displayNameB\"=$emojiB"
+        }
+    }
+
+    fun readParticipantEmoji(displayName: String): String {
+        PlaywrightAssertions.assertThat(participantItem(displayName)).isVisible()
+        val text = participantItem(displayName).innerText().trim()
+        val emoji = text.replace(displayName, "").trim()
+        require(emoji.isNotEmpty()) {
+            "表示名 \"$displayName\" の参加者に絵文字がありません: \"$text\""
+        }
+        return emoji
+    }
+
+    private fun participants(): Locator =
+        main.getByRole(AriaRole.LIST, Locator.GetByRoleOptions().setName("参加者"))
+
+    private fun participantItem(displayName: String): Locator =
+        participants()
+            .getByRole(AriaRole.LISTITEM)
+            .filter(Locator.FilterOptions().setHasText(displayName))
+
     private fun roomCode(): Locator =
         main.getByRole(AriaRole.STATUS, Locator.GetByRoleOptions().setName("ルームコード"))
 
