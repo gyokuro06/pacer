@@ -118,6 +118,18 @@ class RoomPage(page: Page) : BasePage(page) {
         }
     }
 
+    fun assertRemainingTimeApproximately(minutes: Int, toleranceSeconds: Long = 15) {
+        PlaywrightAssertions.assertThat(remainingTime()).isVisible()
+        val actualMmSs = readRemainingTime()
+        val actualSeconds = parseMmSsToSeconds(actualMmSs)
+        val expectedSeconds = minutes * 60.0
+        val delta = kotlin.math.abs(actualSeconds - expectedSeconds)
+        require(delta <= toleranceSeconds) {
+            "残り時間がおよそ ${minutes} 分ではありません: actual=$actualMmSs " +
+                "delta≈${"%.1f".format(delta)}s (tolerance=${toleranceSeconds}s)"
+        }
+    }
+
     private fun parseMmSsToSeconds(mmSs: String): Double {
         val parts = mmSs.split(":")
         require(parts.size == 2) { "残り時間の形式が不正です: $mmSs" }
