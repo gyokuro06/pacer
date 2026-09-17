@@ -142,6 +142,45 @@
   gap: 0.75rem;
 }
 
+.currentMinutes {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.presetGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.presetOption {
+  font: inherit;
+  font-family: var(--font-mono);
+  min-width: 2.75rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.presetOption[aria-checked="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
+
+.presetOption:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.presetOption:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

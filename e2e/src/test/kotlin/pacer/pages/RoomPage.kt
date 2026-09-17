@@ -23,12 +23,9 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun setWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
-        workMinutesInput().fill(workMinutes)
-        workMinutesInput().blur()
-        breakMinutesInput().fill(breakMinutes)
-        breakMinutesInput().blur()
-        PlaywrightAssertions.assertThat(workMinutesInput()).hasValue(workMinutes)
-        PlaywrightAssertions.assertThat(breakMinutesInput()).hasValue(breakMinutes)
+        selectWorkMinutesPreset(workMinutes)
+        selectBreakMinutesPreset(breakMinutes)
+        assertWorkAndBreakPresetsSelected(workMinutes, breakMinutes)
     }
 
     fun joinWithDisplayName(displayName: String) {
@@ -39,14 +36,15 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun assertWorkAndBreakMinutes(workMinutes: String, breakMinutes: String) {
-        PlaywrightAssertions.assertThat(workMinutesInput()).hasValue(workMinutes)
-        PlaywrightAssertions.assertThat(breakMinutesInput()).hasValue(breakMinutes)
+        assertWorkAndBreakPresetsSelected(workMinutes, breakMinutes)
     }
 
     fun assertWorkAndBreakMinutesReadOnly(workMinutes: String, breakMinutes: String) {
-        assertWorkAndBreakMinutes(workMinutes, breakMinutes)
-        PlaywrightAssertions.assertThat(workMinutesInput()).isDisabled()
-        PlaywrightAssertions.assertThat(breakMinutesInput()).isDisabled()
+        assertWorkAndBreakPresetsSelected(workMinutes, breakMinutes)
+        for (preset in minutePresets) {
+            PlaywrightAssertions.assertThat(workPresetOption(preset)).isDisabled()
+            PlaywrightAssertions.assertThat(breakPresetOption(preset)).isDisabled()
+        }
     }
 
     fun selectWorkMinutesPreset(minutes: String) {
@@ -488,12 +486,6 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun copyShareUrlButton(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("共有URLをコピー"))
-
-    private fun workMinutesInput(): Locator =
-        main.getByRole(AriaRole.SPINBUTTON, Locator.GetByRoleOptions().setName("作業（分）"))
-
-    private fun breakMinutesInput(): Locator =
-        main.getByRole(AriaRole.SPINBUTTON, Locator.GetByRoleOptions().setName("休憩（分）"))
 
     private fun workMinutesGroup(): Locator =
         main.getByRole(AriaRole.RADIOGROUP, Locator.GetByRoleOptions().setName("作業（分）"))
