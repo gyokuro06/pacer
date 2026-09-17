@@ -17,6 +17,181 @@ class RoomPage(page: Page) : BasePage(page) {
         playwrightPage.waitForURL(Pattern.compile(".*/room/[A-Za-z0-9]+/?$"))
     }
 
+    fun assertWireframeFirstScreenSkeleton() {
+        PlaywrightAssertions.assertThat(brand()).isVisible()
+        PlaywrightAssertions.assertThat(shareUrl()).isVisible()
+        PlaywrightAssertions.assertThat(timerRegion()).isVisible()
+        PlaywrightAssertions.assertThat(primaryCta()).isVisible()
+        PlaywrightAssertions.assertThat(workMinutesGroup()).isVisible()
+        PlaywrightAssertions.assertThat(breakMinutesGroup()).isVisible()
+        assertParticipantSlotsAtoDVisible()
+        assertWireframeVerticalOrder()
+        assertBrandLeftOfShareUrl()
+    }
+
+    fun assertOwnDisplayNameInParticipantSlot() {
+        assertParticipantSlotsAtoDVisible()
+        PlaywrightAssertions.assertThat(ownParticipantSlot()).isVisible()
+        val displayName = readOwnDisplayNameFromSlot()
+        require(displayName.isNotEmpty()) {
+            "参加者枠に自分の表示名が見えません"
+        }
+        PlaywrightAssertions.assertThat(
+            ownParticipantSlot().getByText(displayName, Locator.GetByTextOptions().setExact(true)),
+        ).isVisible()
+        PlaywrightAssertions.assertThat(
+            ownParticipantSlot().getByText("You", Locator.GetByTextOptions().setExact(true)),
+        ).isVisible()
+    }
+
+    fun assertDisplayNameInParticipantSlot(displayName: String) {
+        assertParticipantSlotsAtoDVisible()
+        PlaywrightAssertions.assertThat(participantSlotContaining(displayName)).isVisible()
+        PlaywrightAssertions.assertThat(
+            participantSlotContaining(displayName)
+                .getByText(displayName, Locator.GetByTextOptions().setExact(true)),
+        ).isVisible()
+    }
+
+    fun assertWorkPhaseAboveTimer() {
+        PlaywrightAssertions.assertThat(phaseLabel("作業")).isVisible()
+        PlaywrightAssertions.assertThat(remainingTime()).isVisible()
+        val phaseBox =
+            phaseLabel("作業").boundingBox()
+                ?: error("フェーズの位置が取得できません")
+        val timerBox =
+            remainingTime().boundingBox()
+                ?: error("タイマーの位置が取得できません")
+        require(phaseBox.y + phaseBox.height <= timerBox.y + 8) {
+            "作業フェーズがタイマーの上にありません: phase.bottom=${phaseBox.y + phaseBox.height} timer.y=${timerBox.y}"
+        }
+    }
+
+    fun readRoomCodeFromUrl(): String {
+        val matcher = ROOM_CODE_IN_URL.matcher(playwrightPage.url())
+        require(matcher.find()) {
+            "アドレスバーからルームコードを読めません: ${playwrightPage.url()}"
+        }
+        return matcher.group(1)
+    }
+
+    fun joinViaJoinDialog(displayName: String) {
+        val dialog = joinDialog()
+        if (dialog.count() == 0) {
+            val openButton = openJoinDialogButton()
+            require(openButton.count() > 0) {
+                "参加ダイアログ（role=dialog name=参加）も「参加する」ボタンもなく、ダイアログ参加できません"
+            }
+            openButton.click()
+        }
+        PlaywrightAssertions.assertThat(dialog).isVisible()
+        dialog
+            .getByRole(AriaRole.TEXTBOX, Locator.GetByRoleOptions().setName("参加用の表示名"))
+            .fill(displayName)
+        dialog.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加")).click()
+        PlaywrightAssertions.assertThat(dialog).hasCount(0)
+    }
+
+    fun openOwnProfileViaParticipantSlot() {
+        val displayName = readOwnDisplayNameFromSlot()
+        ownParticipantSlot()
+            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(displayName))
+            .click()
+        assertProfileDialogVisible()
+    }
+
+    private fun assertParticipantSlotsAtoDVisible() {
+        for (letter in PARTICIPANT_SLOT_LETTERS) {
+            PlaywrightAssertions.assertThat(participantSlot(letter)).isVisible()
+        }
+    }
+
+    private fun assertWireframeVerticalOrder() {
+        val brandBox = requireBox(brand(), "ブランド")
+        val shareBox = requireBox(shareUrl(), "共有URL")
+        val timerBox = requireBox(timerRegion(), "タイマー")
+        val ctaBox = requireBox(primaryCta(), "主CTA")
+        val workBox = requireBox(workMinutesGroup(), "作業プリセット")
+        val slotsBox = requireBox(participants(), "参加者枠")
+        require(brandBox.y < timerBox.y) {
+            "ブランドがタイマーより上にありません: brand.y=${brandBox.y} timer.y=${timerBox.y}"
+        }
+        require(shareBox.y < timerBox.y) {
+            "共有URLがタイマーより上にありません: share.y=${shareBox.y} timer.y=${timerBox.y}"
+        }
+        require(timerBox.y + timerBox.height <= ctaBox.y + 8) {
+            "主CTAがタイマーの下にありません: timer.bottom=${timerBox.y + timerBox.height} cta.y=${ctaBox.y}"
+        }
+        require(ctaBox.y + ctaBox.height <= workBox.y + 8) {
+            "work/rest が主CTAの下にありません: cta.bottom=${ctaBox.y + ctaBox.height} work.y=${workBox.y}"
+        }
+        require(workBox.y + workBox.height <= slotsBox.y + 8) {
+            "参加者枠が下段にありません: work.bottom=${workBox.y + workBox.height} slots.y=${slotsBox.y}"
+        }
+    }
+
+    private fun assertBrandLeftOfShareUrl() {
+        val brandBox = requireBox(brand(), "ブランド")
+        val shareBox = requireBox(shareUrl(), "共有URL")
+        require(brandBox.x < shareBox.x) {
+            "ブランドが共有URLより左にありません: brand.x=${brandBox.x} share.x=${shareBox.x}"
+        }
+    }
+
+    private fun requireBox(locator: Locator, label: String): com.microsoft.playwright.options.BoundingBox =
+        locator.boundingBox() ?: error("${label}の位置が取得できません")
+
+    private fun brand(): Locator =
+        main.getByRole(AriaRole.HEADING, Locator.GetByRoleOptions().setName("pacer"))
+
+    private fun timerRegion(): Locator =
+        main.getByRole(AriaRole.REGION, Locator.GetByRoleOptions().setName("タイマー"))
+
+    private fun primaryCta(): Locator =
+        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("スタート"))
+
+    private fun participantSlot(letter: String): Locator =
+        participants().getByRole(
+            AriaRole.LISTITEM,
+            Locator.GetByRoleOptions().setName("参加者枠 $letter"),
+        )
+
+    private fun ownParticipantSlot(): Locator =
+        participants()
+            .getByRole(AriaRole.LISTITEM)
+            .filter(
+                Locator.FilterOptions().setHas(
+                    playwrightPage.getByText("You", Page.GetByTextOptions().setExact(true)),
+                ),
+            )
+
+    private fun participantSlotContaining(displayName: String): Locator =
+        participants()
+            .getByRole(AriaRole.LISTITEM)
+            .filter(
+                Locator.FilterOptions().setHas(
+                    playwrightPage.getByText(displayName, Page.GetByTextOptions().setExact(true)),
+                ),
+            )
+
+    private fun readOwnDisplayNameFromSlot(): String {
+        PlaywrightAssertions.assertThat(ownParticipantSlot()).isVisible()
+        val text = ownParticipantSlot().innerText().trim()
+        val displayName =
+            text
+                .lines()
+                .map { it.trim() }
+                .firstOrNull { it.isNotEmpty() && it != "You" && it !in PARTICIPANT_SLOT_LETTERS }
+                ?: error("参加者枠から自分の表示名を読めません: \"$text\"")
+        return displayName
+    }
+
+    private fun joinDialog(): Locator =
+        playwrightPage.getByRole(AriaRole.DIALOG, Page.GetByRoleOptions().setName("参加"))
+
+    private fun openJoinDialogButton(): Locator =
+        main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("参加する"))
+
     fun setDisplayName(displayName: String) {
         PlaywrightAssertions.assertThat(displayNameInput()).isVisible()
         displayNameInput().fill(displayName)
@@ -662,6 +837,8 @@ class RoomPage(page: Page) : BasePage(page) {
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("提案を確定"))
 
     companion object {
+        private val ROOM_CODE_IN_URL = Pattern.compile(".*/room/([A-Za-z0-9]+)/?$")
+        private val PARTICIPANT_SLOT_LETTERS = listOf("A", "B", "C", "D")
         private val AUTO_DISPLAY_NAMES = setOf(
             "ねこぱんつ",
             "うどん侍",
