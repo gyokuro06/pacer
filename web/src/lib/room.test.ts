@@ -20,6 +20,7 @@ import {
   updateRoomMinutesState,
   timerEndNotificationTitle,
   crossedToTimerEnd,
+  PhaseConflictError,
 } from "./room";
 
 describe("formatRemainingMs", () => {
@@ -297,6 +298,34 @@ describe("session flow", () => {
     assert.equal(onBreak.phase, "break");
     assert.equal(onBreak.pendingProposal, null);
     assert.equal(onBreak.phaseEndsAt, now + 1000 + 5 * 60_000);
+  });
+
+  it("rejects start when phase is already work", () => {
+    const waiting = createRoomState(25, 5, alice, "ABCDEF");
+    const work = startSessionState(waiting, 1_000_000);
+    assert.throws(
+      () => startSessionState(work),
+      (error: unknown) => error instanceof PhaseConflictError,
+    );
+  });
+
+  it("rejects propose when a proposal is already pending", () => {
+    const waiting = createRoomState(25, 5, alice, "ABCDEF");
+    const work = startSessionState(waiting, 1_000_000);
+    const proposed = proposeState(work, "break");
+    assert.throws(
+      () => proposeState(proposed, "break"),
+      (error: unknown) => error instanceof PhaseConflictError,
+    );
+  });
+
+  it("rejects confirm when no proposal is pending", () => {
+    const waiting = createRoomState(25, 5, alice, "ABCDEF");
+    const work = startSessionState(waiting, 1_000_000);
+    assert.throws(
+      () => confirmProposalState(work),
+      (error: unknown) => error instanceof PhaseConflictError,
+    );
   });
 });
 
