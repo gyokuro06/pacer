@@ -17,6 +17,10 @@ object ParticipantSessions {
     private var rememberedRemainingMmSs: String? = null
     private var rememberedRemainingAtMs: Long? = null
     private val rememberedEmojis = mutableMapOf<String, String>()
+    private var lastConcurrentPhaseSuccessCount: Int? = null
+    private var lastConcurrentPhaseConflictCount: Int? = null
+    private val frozenRoomGetJson = mutableMapOf<String, String>()
+    private var lastAlertFlashSeen: Boolean? = null
 
     private val notificationSpyScript =
         """
@@ -146,6 +150,39 @@ object ParticipantSessions {
         rememberedEmojis[displayName]?.takeIf { it.isNotEmpty() }
             ?: error("表示名 \"$displayName\" の絵文字がまだ記憶されていません")
 
+    fun lastConcurrentPhaseSuccessCount(): Int =
+        lastConcurrentPhaseSuccessCount
+            ?: error("同時フェーズ操作の成功回数がまだ記録されていません")
+
+    fun rememberConcurrentPhaseOutcome(successCount: Int, conflictCount: Int) {
+        lastConcurrentPhaseSuccessCount = successCount
+        lastConcurrentPhaseConflictCount = conflictCount
+    }
+
+    fun lastConcurrentPhaseConflictCount(): Int =
+        lastConcurrentPhaseConflictCount
+            ?: error("同時フェーズ操作の前提不一致回数がまだ記録されていません")
+
+    fun rememberFrozenRoomGetJson(participant: String, json: String) {
+        frozenRoomGetJson[participant] = json
+    }
+
+    fun frozenRoomGetJson(participant: String): String =
+        frozenRoomGetJson[participant]?.takeIf { it.isNotEmpty() }
+            ?: error("参加者 \"$participant\" の固定ルーム JSON がありません")
+
+    fun clearFrozenRoomGetJson(participant: String) {
+        frozenRoomGetJson.remove(participant)
+    }
+
+    fun rememberAlertFlashSeen(seen: Boolean) {
+        lastAlertFlashSeen = seen
+    }
+
+    fun lastAlertFlashSeen(): Boolean =
+        lastAlertFlashSeen
+            ?: error("アラート点滅の観測結果がまだありません")
+
     fun clear() {
         contexts.values.forEach { context ->
             runCatching { context.close() }
@@ -157,6 +194,10 @@ object ParticipantSessions {
         rememberedRemainingMmSs = null
         rememberedRemainingAtMs = null
         rememberedEmojis.clear()
+        lastConcurrentPhaseSuccessCount = null
+        lastConcurrentPhaseConflictCount = null
+        frozenRoomGetJson.clear()
+        lastAlertFlashSeen = null
     }
 
     private fun close(participant: String) {

@@ -398,6 +398,162 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(phaseLabel("休憩")).isVisible()
     }
 
+    fun readParticipantId(): String {
+        val code = readRoomCode()
+        val participantId =
+            playwrightPage.evaluate(
+                "code => sessionStorage.getItem('pacer:' + code + ':participantId')",
+                code,
+            ) as String?
+        require(!participantId.isNullOrBlank()) {
+            "sessionStorage に参加者IDがありません: code=$code"
+        }
+        return participantId
+    }
+
+    fun postPhaseActionConcurrentlyWith(
+        other: RoomPage,
+        pathSuffix: String,
+        body: Map<String, Any?> = emptyMap(),
+    ): ConcurrentPhaseOutcome {
+        val code = readRoomCode()
+        val origin = config.target.url.toString().trimEnd('/')
+        val selfId = readParticipantId()
+        val otherId = other.readParticipantId()
+        @Suppress("UNCHECKED_CAST")
+        val result =
+            playwrightPage.evaluate(
+                """async ({ origin, code, pathSuffix, selfId, otherId, body }) => {
+                     const post = async (participantId) => {
+                       const response = await fetch(
+                         origin + '/api/rooms/' + encodeURIComponent(code) + pathSuffix,
+                         {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ ...body, participantId }),
+                         },
+                       );
+                       return response.status;
+                     };
+                     const statuses = await Promise.all([post(selfId), post(otherId)]);
+                     return { statuses };
+                   }""",
+                mapOf(
+                    "origin" to origin,
+                    "code" to code,
+                    "pathSuffix" to pathSuffix,
+                    "selfId" to selfId,
+                    "otherId" to otherId,
+                    "body" to body,
+                ),
+            ) as Map<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val statuses = (result["statuses"] as List<Any?>).map { (it as Number).toInt() }
+        val successCount = statuses.count { it in 200..299 }
+        val conflictCount = statuses.count { it == 409 }
+        playwrightPage.reload()
+        assertOnRoomPage()
+        other.playwrightPage.reload()
+        other.assertOnRoomPage()
+        return ConcurrentPhaseOutcome(successCount = successCount, conflictCount = conflictCount)
+    }
+
+    data class ConcurrentPhaseOutcome(val successCount: Int, val conflictCount: Int)
+
+    fun freezeRoomGetAsCurrentSnapshot(freezeKey: String) {
+        val code = readRoomCode()
+        val origin = config.target.url.toString().trimEnd('/')
+        val response = playwrightPage.request().get("$origin/api/rooms/${code.trim()}")
+        require(response.ok()) {
+            "ルーム取得の固定用スナップショットに失敗: status=${response.status()}"
+        }
+        val json = response.text()
+        ParticipantSessions.rememberFrozenRoomGetJson(freezeKey, json)
+        val pattern = "**/api/rooms/$code"
+        playwrightPage.unroute(pattern)
+        playwrightPage.route(pattern) { route ->
+            if (route.request().method().equals("GET", ignoreCase = true)) {
+                route.fulfill(
+                    com.microsoft.playwright.Route.FulfillOptions()
+                        .setStatus(200)
+                        .setContentType("application/json")
+                        .setBody(ParticipantSessions.frozenRoomGetJson(freezeKey)),
+                )
+            } else {
+                route.resume()
+            }
+        }
+    }
+
+    fun unfreezeRoomGet(freezeKey: String) {
+        val code = readRoomCode()
+        playwrightPage.unroute("**/api/rooms/$code")
+        ParticipantSessions.clearFrozenRoomGetJson(freezeKey)
+        playwrightPage.reload()
+        assertOnRoomPage()
+    }
+
+    fun assertConfirmProposalVisible() {
+        PlaywrightAssertions.assertThat(confirmProposalButton()).isVisible()
+    }
+
+    fun confirmProposalCapturingAlertFlash(): Boolean {
+        installAlertFlashSpy()
+        PlaywrightAssertions.assertThat(confirmProposalButton()).isVisible()
+        confirmProposalButton().click()
+        playwrightPage.waitForTimeout(1_200.0)
+        return alertFlashSeen()
+    }
+
+    fun assertNoPhaseActionError(alertFlashed: Boolean) {
+        require(!alertFlashed) {
+            "フェーズ操作のエラーが一瞬でも表示されました"
+        }
+        PlaywrightAssertions.assertThat(phaseActionError()).hasCount(0)
+    }
+
+    fun assertStartButtonVisible() {
+        PlaywrightAssertions.assertThat(startButton()).isVisible()
+    }
+
+    fun startSessionCapturingAlertFlash(): Boolean {
+        installAlertFlashSpy()
+        PlaywrightAssertions.assertThat(startButton()).isVisible()
+        startButton().click()
+        playwrightPage.waitForTimeout(1_200.0)
+        return alertFlashSeen()
+    }
+
+    private fun installAlertFlashSpy() {
+        playwrightPage.evaluate(
+            """() => {
+                 window.__pacerAlertFlashSeen = false;
+                 if (window.__pacerAlertFlashObserver) {
+                   window.__pacerAlertFlashObserver.disconnect();
+                 }
+                 const mark = () => {
+                   if (document.querySelector('[role="alert"]')) {
+                     window.__pacerAlertFlashSeen = true;
+                   }
+                 };
+                 mark();
+                 const observer = new MutationObserver(mark);
+                 observer.observe(document.documentElement, {
+                   childList: true,
+                   subtree: true,
+                   attributes: true,
+                 });
+                 window.__pacerAlertFlashObserver = observer;
+               }""",
+        )
+    }
+
+    private fun alertFlashSeen(): Boolean =
+        playwrightPage.evaluate("() => !!window.__pacerAlertFlashSeen") as Boolean
+
+    private fun phaseActionError(): Locator =
+        playwrightPage.getByRole(AriaRole.ALERT)
+
     fun advanceTimerPastEnd() {
         ParticipantSessions.ensureClockInstalled(playwrightPage)
         val remainingMs = (parseMmSsToSeconds(readRemainingTime()) * 1000).toLong() + 1_000
