@@ -23,7 +23,6 @@ import styles from "./page.module.css";
 
 const POLL_MS = 500;
 const MINUTE_PRESETS = [60, 30, 15, 10] as const;
-const PARTICIPANT_SLOT_LETTERS = ["A", "B", "C", "D"] as const;
 
 function isMinutePreset(value: number): boolean {
   return (MINUTE_PRESETS as readonly number[]).includes(value);
@@ -392,8 +391,8 @@ export default function RoomPage() {
             >
               <svg
                 aria-hidden="true"
-                width="1.25em"
-                height="1.25em"
+                width="1em"
+                height="1em"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -411,120 +410,128 @@ export default function RoomPage() {
           </div>
         </div>
 
-        <section
-          role="region"
-          aria-label="タイマー"
-          className={styles.timerRegion}
-        >
-          {room.phase !== "waiting" ? (
-            <div role="status" aria-label="フェーズ" className={styles.phase}>
-              {phaseLabel(room.phase)}
-            </div>
-          ) : null}
+        <div className={styles.session}>
+          <section
+            role="region"
+            aria-label="タイマー"
+            className={styles.timerRegion}
+          >
+            {room.phase !== "waiting" ? (
+              <div role="status" aria-label="フェーズ" className={styles.phase}>
+                {phaseLabel(room.phase)}
+              </div>
+            ) : null}
 
-          {timerEndedTitle ? (
-            <p
-              role="status"
-              aria-live="assertive"
-              className={styles.timerEndNotice}
-            >
-              {timerEndedTitle}
-            </p>
-          ) : null}
+            {timerEndedTitle ? (
+              <p
+                role="status"
+                aria-live="assertive"
+                className={styles.timerEndNotice}
+              >
+                {timerEndedTitle}
+              </p>
+            ) : null}
 
-          {showTimer ? (
-            <div role="timer" aria-label="残り時間" className={styles.timer}>
-              {formatRemainingMs(remaining)}
-            </div>
-          ) : (
-            <div className={styles.timerPlaceholder} aria-hidden="true">
-              --:--
-            </div>
-          )}
-        </section>
+            {showTimer ? (
+              <div role="timer" aria-label="残り時間" className={styles.timer}>
+                {formatRemainingMs(remaining)}
+              </div>
+            ) : (
+              <div className={styles.timerPlaceholder} aria-hidden="true">
+                --:--
+              </div>
+            )}
+          </section>
 
-        <div className={styles.actions}>
-          {room.phase === "waiting" && isParticipant ? (
-            <button
-              type="button"
-              disabled={!canStart(room)}
-              onClick={() => {
-                unlockAudio();
-                void requestNotificationPermission();
-                void postAction(
-                  `/api/rooms/${encodeURIComponent(code)}/start`,
-                );
-              }}
-            >
-              スタート
-            </button>
-          ) : null}
+          <div className={styles.actions}>
+            {room.phase === "waiting" && isParticipant ? (
+              <button
+                type="button"
+                className={styles.actionPrimary}
+                disabled={!canStart(room)}
+                onClick={() => {
+                  unlockAudio();
+                  void requestNotificationPermission();
+                  void postAction(
+                    `/api/rooms/${encodeURIComponent(code)}/start`,
+                  );
+                }}
+              >
+                スタート
+              </button>
+            ) : null}
 
-          {isParticipant &&
-          notificationPermission !== "granted" &&
-          notificationPermission !== "unsupported" ? (
-            <button
-              type="button"
-              onClick={() => {
-                unlockAudio();
-                void requestNotificationPermission();
-              }}
-            >
-              通知をオン
-            </button>
-          ) : null}
+            {isParticipant &&
+            notificationPermission !== "granted" &&
+            notificationPermission !== "unsupported" ? (
+              <button
+                type="button"
+                className={styles.actionSecondary}
+                onClick={() => {
+                  unlockAudio();
+                  void requestNotificationPermission();
+                }}
+              >
+                通知をオン
+              </button>
+            ) : null}
 
-          {room.phase === "work" &&
-          room.pendingProposal == null &&
-          isParticipant ? (
-            <button
-              type="button"
-              onClick={() =>
-                void postAction(
-                  `/api/rooms/${encodeURIComponent(code)}/propose`,
-                  { kind: "break" },
-                )
-              }
-            >
-              休憩を提案
-            </button>
-          ) : null}
+            {room.phase === "work" &&
+            room.pendingProposal == null &&
+            isParticipant ? (
+              <button
+                type="button"
+                className={styles.actionSecondary}
+                onClick={() =>
+                  void postAction(
+                    `/api/rooms/${encodeURIComponent(code)}/propose`,
+                    { kind: "break" },
+                  )
+                }
+              >
+                休憩を提案
+              </button>
+            ) : null}
 
-          {room.phase === "break" &&
-          room.pendingProposal == null &&
-          isParticipant ? (
-            <button
-              type="button"
-              onClick={() =>
-                void postAction(
-                  `/api/rooms/${encodeURIComponent(code)}/propose`,
-                  { kind: "work" },
-                )
-              }
-            >
-              再開を提案
-            </button>
-          ) : null}
+            {room.phase === "break" &&
+            room.pendingProposal == null &&
+            isParticipant ? (
+              <button
+                type="button"
+                className={styles.actionSecondary}
+                onClick={() =>
+                  void postAction(
+                    `/api/rooms/${encodeURIComponent(code)}/propose`,
+                    { kind: "work" },
+                  )
+                }
+              >
+                再開を提案
+              </button>
+            ) : null}
 
-          {room.pendingProposal != null && isParticipant ? (
-            <button
-              type="button"
-              onClick={() =>
-                void postAction(`/api/rooms/${encodeURIComponent(code)}/confirm`)
-              }
-            >
-              提案を確定
-            </button>
-          ) : null}
+            {room.pendingProposal != null && isParticipant ? (
+              <button
+                type="button"
+                className={styles.actionPrimary}
+                onClick={() =>
+                  void postAction(`/api/rooms/${encodeURIComponent(code)}/confirm`)
+                }
+              >
+                提案を確定
+              </button>
+            ) : null}
 
-          {!isParticipant && !showJoinDialog ? (
-            <button
-              type="button"
-              onClick={() => setJoinDialogOpen(true)}
-            >
-              参加する
-            </button>
-          ) : null}
+            {!isParticipant && !showJoinDialog ? (
+              <button
+                type="button"
+                className={styles.actionPrimary}
+                onClick={() => setJoinDialogOpen(true)}
+              >
+                参加する
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className={styles.minutes}>
@@ -601,54 +608,41 @@ export default function RoomPage() {
         </div>
 
         <ul aria-label="参加者" className={styles.participants}>
-          {PARTICIPANT_SLOT_LETTERS.map((letter, index) => {
-            const participant = room.participants[index] ?? null;
-            const isSelf = participant != null && participant.id === participantId;
+          {room.participants.map((participant) => {
+            const isSelf = participant.id === participantId;
             return (
-              <li
-                key={letter}
-                aria-label={`参加者枠 ${letter}`}
-                className={styles.participant}
-              >
-                {participant ? (
-                  <>
-                    {isSelf ? (
-                      <button
-                        type="button"
-                        className={styles.avatar}
-                        aria-label={`${participant.displayName}のアバター`}
-                        onClick={() => openProfile(participant.displayName)}
-                      >
-                        {participant.emoji}
-                      </button>
-                    ) : (
-                      <span
-                        className={styles.avatar}
-                        aria-label={`${participant.displayName}のアバター`}
-                      >
-                        {participant.emoji}
-                      </span>
-                    )}
-                    {isSelf ? (
-                      <button
-                        type="button"
-                        className={styles.displayName}
-                        onClick={() => openProfile(participant.displayName)}
-                      >
-                        {participant.displayName}
-                      </button>
-                    ) : (
-                      <span className={styles.displayName}>
-                        {participant.displayName}
-                      </span>
-                    )}
-                    {isSelf ? (
-                      <span className={styles.youLabel}>You</span>
-                    ) : null}
-                  </>
+              <li key={participant.id} className={styles.participant}>
+                {isSelf ? (
+                  <button
+                    type="button"
+                    className={styles.avatar}
+                    aria-label={`${participant.displayName}のアバター`}
+                    onClick={() => openProfile(participant.displayName)}
+                  >
+                    {participant.emoji}
+                  </button>
                 ) : (
-                  <span className={styles.slotLetter}>{letter}</span>
+                  <span
+                    className={styles.avatar}
+                    aria-label={`${participant.displayName}のアバター`}
+                  >
+                    {participant.emoji}
+                  </span>
                 )}
+                {isSelf ? (
+                  <button
+                    type="button"
+                    className={styles.displayName}
+                    onClick={() => openProfile(participant.displayName)}
+                  >
+                    {participant.displayName}
+                  </button>
+                ) : (
+                  <span className={styles.displayName}>
+                    {participant.displayName}
+                  </span>
+                )}
+                {isSelf ? <span className={styles.youLabel}>You</span> : null}
               </li>
             );
           })}

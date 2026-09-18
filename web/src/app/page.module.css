@@ -2,7 +2,8 @@
   min-height: 100%;
   display: flex;
   justify-content: center;
-  padding: clamp(1.5rem, 4vw, 3rem);
+  align-items: center;
+  padding: clamp(var(--space-6), 6vw, var(--space-8));
   background:
     radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
     radial-gradient(ellipse at 90% 10%, color-mix(in srgb, var(--accent-soft) 35%, transparent), transparent 45%),
@@ -10,20 +11,21 @@
 }
 
 .main {
-  width: min(100%, clamp(28rem, 45vw, 40rem));
+  width: min(100%, var(--content-width));
   display: flex;
   flex-direction: column;
-  gap: clamp(1.25rem, 2.5vw, 2rem);
+  gap: clamp(var(--space-5), 3vw, var(--space-7));
 }
 
 .brand {
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-size: var(--text-brand);
   letter-spacing: -0.04em;
   line-height: 1;
 }
 
 .tagline {
   color: var(--muted);
-  margin-bottom: 0.5rem;
+  font-size: var(--text-md);
+  line-height: 1.6;
 }

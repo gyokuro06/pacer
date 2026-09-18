@@ -24,13 +24,12 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(primaryCta()).isVisible()
         PlaywrightAssertions.assertThat(workMinutesGroup()).isVisible()
         PlaywrightAssertions.assertThat(breakMinutesGroup()).isVisible()
-        assertParticipantSlotsAtoDVisible()
+        PlaywrightAssertions.assertThat(participants()).isVisible()
         assertWireframeVerticalOrder()
         assertBrandLeftOfShareUrl()
     }
 
     fun assertOwnDisplayNameInParticipantSlot() {
-        assertParticipantSlotsAtoDVisible()
         PlaywrightAssertions.assertThat(ownParticipantSlot()).isVisible()
         val displayName = readOwnDisplayNameFromSlot()
         require(displayName.isNotEmpty()) {
@@ -45,7 +44,6 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun assertDisplayNameInParticipantSlot(displayName: String) {
-        assertParticipantSlotsAtoDVisible()
         PlaywrightAssertions.assertThat(participantSlotContaining(displayName)).isVisible()
         PlaywrightAssertions.assertThat(
             participantSlotContaining(displayName)
@@ -98,12 +96,6 @@ class RoomPage(page: Page) : BasePage(page) {
         assertProfileDialogVisible()
     }
 
-    private fun assertParticipantSlotsAtoDVisible() {
-        for (letter in PARTICIPANT_SLOT_LETTERS) {
-            PlaywrightAssertions.assertThat(participantSlot(letter)).isVisible()
-        }
-    }
-
     private fun assertWireframeVerticalOrder() {
         val brandBox = requireBox(brand(), "ブランド")
         val shareBox = requireBox(shareUrl(), "共有URL")
@@ -147,12 +139,6 @@ class RoomPage(page: Page) : BasePage(page) {
 
     private fun primaryCta(): Locator =
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("スタート"))
-
-    private fun participantSlot(letter: String): Locator =
-        participants().getByRole(
-            AriaRole.LISTITEM,
-            Locator.GetByRoleOptions().setName("参加者枠 $letter"),
-        )
 
     private fun ownParticipantSlot(): Locator =
         participants()
@@ -290,7 +276,6 @@ class RoomPage(page: Page) : BasePage(page) {
     }
 
     fun assertAutoDisplayNameVisible() {
-        assertParticipantSlotsAtoDVisible()
         val name = readOwnDisplayNameFromSlot()
         require(name.isNotEmpty()) { "表示名が自動で付いていません" }
         require(AUTO_DISPLAY_NAMES.contains(name)) {
@@ -824,7 +809,6 @@ class RoomPage(page: Page) : BasePage(page) {
 
     companion object {
         private val ROOM_CODE_IN_URL = Pattern.compile(".*/room/([A-Za-z0-9]+)/?$")
-        private val PARTICIPANT_SLOT_LETTERS = listOf("A", "B", "C", "D")
         private val AUTO_DISPLAY_NAMES = setOf(
             "ねこぱんつ",
             "うどん侍",
