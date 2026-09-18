@@ -72,15 +72,18 @@ class PhasePreconditionGuardStep {
 
     @Step("参加者 <name> が固定表示のままセッション開始を試行する")
     fun 参加者が固定表示のままセッション開始を試行する(name: String) {
-        val seen = RoomPage(ParticipantSessions.page(name)).startSessionCapturingAlertFlash()
-        ParticipantSessions.rememberAlertFlashSeen(seen)
+        val observation =
+            RoomPage(ParticipantSessions.page(name)).startSessionCapturingConflictUi()
+        ParticipantSessions.rememberAlertFlashSeen(observation.alertFlashed)
+        ParticipantSessions.rememberConflictToastSeen(observation.toastFlashed)
     }
 
     @Step("参加者 <name> が固定表示のまま休憩提案の確定を試行する")
     fun 参加者が固定表示のまま休憩提案の確定を試行する(name: String) {
-        val seen =
-            RoomPage(ParticipantSessions.page(name)).confirmProposalCapturingAlertFlash()
-        ParticipantSessions.rememberAlertFlashSeen(seen)
+        val observation =
+            RoomPage(ParticipantSessions.page(name)).confirmProposalCapturingConflictUi()
+        ParticipantSessions.rememberAlertFlashSeen(observation.alertFlashed)
+        ParticipantSessions.rememberConflictToastSeen(observation.toastFlashed)
     }
 
     @Step("参加者 <name> のルーム取得の固定を解除する")
@@ -88,8 +91,15 @@ class PhasePreconditionGuardStep {
         RoomPage(ParticipantSessions.page(name)).unfreezeRoomGet(name)
     }
 
-    @Step("参加者 <name> にフェーズ操作のエラーが表示されていない")
-    fun 参加者にフェーズ操作のエラーが表示されていない(name: String) {
+    @Step("参加者 <name> に衝突の共通トーストが一瞬表示された")
+    fun 参加者に衝突の共通トーストが一瞬表示された(name: String) {
+        RoomPage(ParticipantSessions.page(name)).assertConflictToastFlashed(
+            ParticipantSessions.lastConflictToastSeen(),
+        )
+    }
+
+    @Step("参加者 <name> にフェーズ操作のインラインエラーが表示されていない")
+    fun 参加者にフェーズ操作のインラインエラーが表示されていない(name: String) {
         RoomPage(ParticipantSessions.page(name)).assertNoPhaseActionError(
             ParticipantSessions.lastAlertFlashSeen(),
         )

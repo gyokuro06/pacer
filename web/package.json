@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint",
-    "test:unit": "tsx --test src/lib/room.test.ts src/lib/room-durable.test.ts src/lib/room-store.persist.test.ts src/lib/room-poll.test.ts",
+    "test:unit": "tsx --test src/lib/room.test.ts src/lib/room-durable.test.ts src/lib/room-store.persist.test.ts src/lib/room-poll.test.ts src/lib/room-snapshot.test.ts",
     "test:persist": "tsx --test src/lib/room-store.persist.test.ts"
   },
   "dependencies": {

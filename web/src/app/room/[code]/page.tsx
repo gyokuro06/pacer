@@ -20,9 +20,13 @@ import {
   type Room,
 } from "@/lib/room";
 import { roomPollIntervalMs } from "@/lib/room-poll";
+import { coalesceRoomByActivity } from "@/lib/room-snapshot";
 import styles from "./page.module.css";
 
 const MINUTE_PRESETS = [60, 30, 15, 10] as const;
+const CONFLICT_TOAST_TEXT =
+  "他の操作と重なったため、最新の状態に更新しました";
+const CONFLICT_TOAST_MS = 1500;
 
 function isMinutePreset(value: number): boolean {
   return (MINUTE_PRESETS as readonly number[]).includes(value);
@@ -93,6 +97,7 @@ export default function RoomPage() {
   const code = String(params.code ?? "").toUpperCase();
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [conflictToast, setConflictToast] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [joinName, setJoinName] = useState("");
@@ -126,7 +131,7 @@ export default function RoomPage() {
     if (!response.ok) {
       throw new Error(data.error ?? "ルーム取得に失敗しました");
     }
-    setRoom(data.room);
+    setRoom((prev) => coalesceRoomByActivity(prev, data.room));
   }, [code]);
 
   useEffect(() => {
@@ -163,6 +168,12 @@ export default function RoomPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [profileOpen]);
 
+  useEffect(() => {
+    if (!conflictToast) return;
+    const id = window.setTimeout(() => setConflictToast(null), CONFLICT_TOAST_MS);
+    return () => window.clearTimeout(id);
+  }, [conflictToast]);
+
   async function postAction(
     path: string,
     body?: Record<string, unknown>,
@@ -180,13 +191,14 @@ export default function RoomPage() {
     const data = await response.json();
     if (!response.ok) {
       if (response.status === 409) {
+        setConflictToast(CONFLICT_TOAST_TEXT);
         await refresh();
         return false;
       }
       setError(data.error ?? "操作に失敗しました");
       return false;
     }
-    setRoom(data.room);
+    setRoom((prev) => coalesceRoomByActivity(prev, data.room));
     return true;
   }
 
@@ -230,7 +242,7 @@ export default function RoomPage() {
       setError(data.error ?? "更新に失敗しました");
       return false;
     }
-    setRoom(data.room);
+    setRoom((prev) => coalesceRoomByActivity(prev, data.room));
     return true;
   }
 
@@ -250,7 +262,7 @@ export default function RoomPage() {
     }
     storeParticipant(data.room.code, data.participantId);
     setParticipantId(data.participantId);
-    setRoom(data.room);
+    setRoom((prev) => coalesceRoomByActivity(prev, data.room));
     setJoinDialogOpen(false);
     setJoinName("");
   }
@@ -720,6 +732,12 @@ export default function RoomPage() {
               </button>
             </div>
           </div>
+        ) : null}
+
+        {conflictToast ? (
+          <p role="status" className={styles.conflictToast}>
+            {conflictToast}
+          </p>
         ) : null}
 
         {error ? (
