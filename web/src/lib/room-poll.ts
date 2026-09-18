@@ -6,6 +6,5 @@ export const ROOM_POLL_MS_PENDING = 500;
 export function roomPollIntervalMs(
   pendingProposal: ProposalKind | null,
 ): number {
-  void pendingProposal;
-  return ROOM_POLL_MS_PENDING;
+  return pendingProposal == null ? ROOM_POLL_MS_IDLE : ROOM_POLL_MS_PENDING;
 }
