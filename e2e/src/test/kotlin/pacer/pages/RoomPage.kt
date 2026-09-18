@@ -497,17 +497,23 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(confirmProposalButton()).isVisible()
     }
 
-    fun confirmProposalCapturingAlertFlash(): Boolean {
-        installAlertFlashSpy()
+    fun confirmProposalCapturingConflictUi(): ConflictUiObservation {
+        installConflictUiSpy()
         PlaywrightAssertions.assertThat(confirmProposalButton()).isVisible()
         confirmProposalButton().click()
         playwrightPage.waitForTimeout(1_200.0)
-        return alertFlashSeen()
+        return conflictUiObservation()
+    }
+
+    fun assertConflictToastFlashed(toastFlashed: Boolean) {
+        require(toastFlashed) {
+            "衝突の共通トースト（「$CONFLICT_TOAST_TEXT」）が一瞬も表示されませんでした"
+        }
     }
 
     fun assertNoPhaseActionError(alertFlashed: Boolean) {
         require(!alertFlashed) {
-            "フェーズ操作のエラーが一瞬でも表示されました"
+            "フェーズ操作のインラインエラーが一瞬でも表示されました"
         }
         PlaywrightAssertions.assertThat(phaseActionError()).hasCount(0)
     }
@@ -516,24 +522,34 @@ class RoomPage(page: Page) : BasePage(page) {
         PlaywrightAssertions.assertThat(startButton()).isVisible()
     }
 
-    fun startSessionCapturingAlertFlash(): Boolean {
-        installAlertFlashSpy()
+    fun startSessionCapturingConflictUi(): ConflictUiObservation {
+        installConflictUiSpy()
         PlaywrightAssertions.assertThat(startButton()).isVisible()
         startButton().click()
         playwrightPage.waitForTimeout(1_200.0)
-        return alertFlashSeen()
+        return conflictUiObservation()
     }
 
-    private fun installAlertFlashSpy() {
+    data class ConflictUiObservation(val toastFlashed: Boolean, val alertFlashed: Boolean)
+
+    private fun installConflictUiSpy() {
         playwrightPage.evaluate(
-            """() => {
+            """(toastText) => {
                  window.__pacerAlertFlashSeen = false;
-                 if (window.__pacerAlertFlashObserver) {
-                   window.__pacerAlertFlashObserver.disconnect();
+                 window.__pacerConflictToastSeen = false;
+                 if (window.__pacerConflictUiObserver) {
+                   window.__pacerConflictUiObserver.disconnect();
                  }
                  const mark = () => {
                    if (document.querySelector('main [role="alert"]')) {
                      window.__pacerAlertFlashSeen = true;
+                   }
+                   const statuses = document.querySelectorAll('[role="status"]');
+                   for (const el of statuses) {
+                     if ((el.textContent || '').includes(toastText)) {
+                       window.__pacerConflictToastSeen = true;
+                       break;
+                     }
                    }
                  };
                  mark();
@@ -543,13 +559,19 @@ class RoomPage(page: Page) : BasePage(page) {
                    subtree: true,
                    attributes: true,
                  });
-                 window.__pacerAlertFlashObserver = observer;
+                 window.__pacerConflictUiObserver = observer;
                }""",
+            CONFLICT_TOAST_TEXT,
         )
     }
 
-    private fun alertFlashSeen(): Boolean =
-        playwrightPage.evaluate("() => !!window.__pacerAlertFlashSeen") as Boolean
+    private fun conflictUiObservation(): ConflictUiObservation =
+        ConflictUiObservation(
+            toastFlashed =
+                playwrightPage.evaluate("() => !!window.__pacerConflictToastSeen") as Boolean,
+            alertFlashed =
+                playwrightPage.evaluate("() => !!window.__pacerAlertFlashSeen") as Boolean,
+        )
 
     private fun phaseActionError(): Locator =
         main.getByRole(AriaRole.ALERT)
@@ -964,6 +986,7 @@ class RoomPage(page: Page) : BasePage(page) {
         main.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName("提案を確定"))
 
     companion object {
+        const val CONFLICT_TOAST_TEXT = "他の操作と重なったため、最新の状態に更新しました"
         private val ROOM_CODE_IN_URL = Pattern.compile(".*/room/([A-Za-z0-9]+)/?$")
         private val AUTO_DISPLAY_NAMES = setOf(
             "ねこぱんつ",

@@ -21,6 +21,7 @@ object ParticipantSessions {
     private var lastConcurrentPhaseConflictCount: Int? = null
     private val frozenRoomGetJson = mutableMapOf<String, String>()
     private var lastAlertFlashSeen: Boolean? = null
+    private var lastConflictToastSeen: Boolean? = null
 
     private val notificationSpyScript =
         """
@@ -183,6 +184,14 @@ object ParticipantSessions {
         lastAlertFlashSeen
             ?: error("アラート点滅の観測結果がまだありません")
 
+    fun rememberConflictToastSeen(seen: Boolean) {
+        lastConflictToastSeen = seen
+    }
+
+    fun lastConflictToastSeen(): Boolean =
+        lastConflictToastSeen
+            ?: error("衝突トーストの観測結果がまだありません")
+
     fun clear() {
         contexts.values.forEach { context ->
             runCatching { context.close() }
@@ -198,6 +207,7 @@ object ParticipantSessions {
         lastConcurrentPhaseConflictCount = null
         frozenRoomGetJson.clear()
         lastAlertFlashSeen = null
+        lastConflictToastSeen = null
     }
 
     private fun close(participant: String) {
