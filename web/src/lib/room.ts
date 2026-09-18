@@ -32,6 +32,20 @@ export const DEFAULT_BREAK_MINUTES = 10;
 export const SESSION_REJOIN_TTL_HOURS = 24;
 export const SESSION_REJOIN_TTL_MS = SESSION_REJOIN_TTL_HOURS * 60 * 60 * 1000;
 
+export class PhaseConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PhaseConflictError";
+  }
+}
+
+export function isPhaseConflictError(error: unknown): boolean {
+  return (
+    error instanceof PhaseConflictError ||
+    (error instanceof Error && error.name === "PhaseConflictError")
+  );
+}
+
 export const PARTICIPANT_EMOJIS = [
   "🦊",
   "🐸",
@@ -282,7 +296,10 @@ export function joinRoomState(
 }
 
 export function startSessionState(room: Room, now = Date.now()): Room {
-  if (!canStart(room)) {
+  if (room.phase !== "waiting") {
+    throw new PhaseConflictError("セッションは既に開始されています");
+  }
+  if (room.participants.length < MIN_PARTICIPANTS_TO_START) {
     throw new Error("開始条件を満たしていません");
   }
   return {
@@ -334,20 +351,23 @@ export function proposeState(
   now = Date.now(),
 ): Room {
   if (room.phase === "waiting") {
-    throw new Error("セッション開始前は提案できません");
+    throw new PhaseConflictError("セッション開始前は提案できません");
   }
   if (kind === "break" && room.phase !== "work") {
-    throw new Error("作業中のみ休憩を提案できます");
+    throw new PhaseConflictError("作業中のみ休憩を提案できます");
   }
   if (kind === "work" && room.phase !== "break") {
-    throw new Error("休憩中のみ作業再開を提案できます");
+    throw new PhaseConflictError("休憩中のみ作業再開を提案できます");
+  }
+  if (room.pendingProposal != null) {
+    throw new PhaseConflictError("既に提案があります");
   }
   return { ...room, pendingProposal: kind, lastActivityAt: now };
 }
 
 export function confirmProposalState(room: Room, now = Date.now()): Room {
   if (room.pendingProposal == null) {
-    throw new Error("確定する提案がありません");
+    throw new PhaseConflictError("確定する提案がありません");
   }
   if (room.pendingProposal === "break") {
     return {

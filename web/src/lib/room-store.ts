@@ -17,6 +17,7 @@ import { getDurableRoomStore } from "./room-durable";
 
 const globalStore = globalThis as typeof globalThis & {
   __pacerRooms?: Map<string, Room>;
+  __pacerRoomLocks?: Map<string, Promise<unknown>>;
 };
 
 function rooms(): Map<string, Room> {
@@ -24,6 +25,36 @@ function rooms(): Map<string, Room> {
     globalStore.__pacerRooms = new Map();
   }
   return globalStore.__pacerRooms;
+}
+
+function roomLocks(): Map<string, Promise<unknown>> {
+  if (!globalStore.__pacerRoomLocks) {
+    globalStore.__pacerRoomLocks = new Map();
+  }
+  return globalStore.__pacerRoomLocks;
+}
+
+async function withRoomLock<T>(code: string, fn: () => Promise<T>): Promise<T> {
+  const key = code.toUpperCase();
+  const locks = roomLocks();
+  const previous = locks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  locks.set(
+    key,
+    previous.then(
+      () => gate,
+      () => gate,
+    ),
+  );
+  await previous.catch(() => undefined);
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
 }
 
 async function persist(room: Room): Promise<void> {
@@ -80,13 +111,15 @@ export async function joinRoom(
 }
 
 export async function startRoom(code: string): Promise<Room> {
-  const existing = await getRoom(code);
-  if (!existing) {
-    throw new Error("ルームが見つかりません");
-  }
-  const updated = startSessionState(existing);
-  await persist(updated);
-  return updated;
+  return withRoomLock(code, async () => {
+    const existing = await getRoom(code);
+    if (!existing) {
+      throw new Error("ルームが見つかりません");
+    }
+    const updated = startSessionState(existing);
+    await persist(updated);
+    return updated;
+  });
 }
 
 export async function updateRoomMinutes(
@@ -118,23 +151,27 @@ export async function updateDisplayName(
 }
 
 export async function propose(code: string, kind: ProposalKind): Promise<Room> {
-  const existing = await getRoom(code);
-  if (!existing) {
-    throw new Error("ルームが見つかりません");
-  }
-  const updated = proposeState(existing, kind);
-  await persist(updated);
-  return updated;
+  return withRoomLock(code, async () => {
+    const existing = await getRoom(code);
+    if (!existing) {
+      throw new Error("ルームが見つかりません");
+    }
+    const updated = proposeState(existing, kind);
+    await persist(updated);
+    return updated;
+  });
 }
 
 export async function confirm(code: string): Promise<Room> {
-  const existing = await getRoom(code);
-  if (!existing) {
-    throw new Error("ルームが見つかりません");
-  }
-  const updated = confirmProposalState(existing);
-  await persist(updated);
-  return updated;
+  return withRoomLock(code, async () => {
+    const existing = await getRoom(code);
+    if (!existing) {
+      throw new Error("ルームが見つかりません");
+    }
+    const updated = confirmProposalState(existing);
+    await persist(updated);
+    return updated;
+  });
 }
 
 export async function changeParticipantEmoji(

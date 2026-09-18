@@ -532,7 +532,7 @@ class RoomPage(page: Page) : BasePage(page) {
                    window.__pacerAlertFlashObserver.disconnect();
                  }
                  const mark = () => {
-                   if (document.querySelector('[role="alert"]')) {
+                   if (document.querySelector('main [role="alert"]')) {
                      window.__pacerAlertFlashSeen = true;
                    }
                  };
@@ -552,7 +552,7 @@ class RoomPage(page: Page) : BasePage(page) {
         playwrightPage.evaluate("() => !!window.__pacerAlertFlashSeen") as Boolean
 
     private fun phaseActionError(): Locator =
-        playwrightPage.getByRole(AriaRole.ALERT)
+        main.getByRole(AriaRole.ALERT)
 
     fun advanceTimerPastEnd() {
         ParticipantSessions.ensureClockInstalled(playwrightPage)

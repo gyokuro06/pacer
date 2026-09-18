@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireRoomMember } from "@/lib/room";
+import { isPhaseConflictError, requireRoomMember } from "@/lib/room";
 import { getRoom, startRoom } from "@/lib/room-store";
 
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ code: string }> };
 
-function errorStatus(message: string): number {
+function errorStatus(error: unknown, message: string): number {
+  if (isPhaseConflictError(error)) return 409;
   if (message.includes("参加者ID")) return 400;
   if (message.includes("参加者") && message.includes("見つかりません")) return 403;
   if (message.includes("見つかりません")) return 404;
@@ -28,6 +29,6 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ room });
   } catch (error) {
     const message = error instanceof Error ? error.message : "開始に失敗しました";
-    return NextResponse.json({ error: message }, { status: errorStatus(message) });
+    return NextResponse.json({ error: message }, { status: errorStatus(error, message) });
   }
 }

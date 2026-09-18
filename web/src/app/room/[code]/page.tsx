@@ -176,6 +176,10 @@ export default function RoomPage() {
     });
     const data = await response.json();
     if (!response.ok) {
+      if (response.status === 409) {
+        await refresh();
+        return false;
+      }
       setError(data.error ?? "操作に失敗しました");
       return false;
     }
