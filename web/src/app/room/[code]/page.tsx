@@ -19,9 +19,9 @@ import {
   timerEndNotificationTitle,
   type Room,
 } from "@/lib/room";
+import { roomPollIntervalMs } from "@/lib/room-poll";
 import styles from "./page.module.css";
 
-const POLL_MS = 500;
 const MINUTE_PRESETS = [60, 30, 15, 10] as const;
 
 function isMinutePreset(value: number): boolean {
@@ -142,14 +142,17 @@ export default function RoomPage() {
       }
     };
     void tick();
-    const pollId = window.setInterval(() => void tick(), POLL_MS);
+    const pollId = window.setInterval(
+      () => void tick(),
+      roomPollIntervalMs(room?.pendingProposal ?? null),
+    );
     const clockId = window.setInterval(() => setNow(Date.now()), 250);
     return () => {
       cancelled = true;
       window.clearInterval(pollId);
       window.clearInterval(clockId);
     };
-  }, [refresh]);
+  }, [refresh, room?.pendingProposal]);
 
   useEffect(() => {
     if (!profileOpen) return;
